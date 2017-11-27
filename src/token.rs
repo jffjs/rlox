@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TokenType {
     // Single-character tokens
     LeftParen, RightParen, LeftBrace, RightBrace,
@@ -32,6 +32,9 @@ impl fmt::Display for TokenType {
 pub enum Literal {
     String(String),
     Number(f64),
+    True,
+    False,
+    Nil
 }
 
 impl fmt::Display for Literal {
@@ -39,6 +42,9 @@ impl fmt::Display for Literal {
         match self {
             &Literal::String(ref val) => write!(f, "{}", val),
             &Literal::Number(ref val) => write!(f, "{}", val),
+            &Literal::True => write!(f, "true"),
+            &Literal::False => write!(f, "false"),
+            &Literal::Nil => write!(f, "nil")
         }
     }
 }

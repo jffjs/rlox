@@ -1,5 +1,7 @@
 mod scanner;
+mod parser;
 mod token;
+mod ast;
 
 use std::error::Error;
 use std::fmt;

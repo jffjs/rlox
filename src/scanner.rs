@@ -204,7 +204,14 @@ impl Scanner {
             None => TokenType::Identifier
         };
 
-        self.add_token(token_type, None)
+        let literal = match token_type {
+            TokenType::True => Some(Literal::True),
+            TokenType::False => Some(Literal::False),
+            TokenType::Nil => Some(Literal::Nil),
+            _ => None
+        };
+
+        self.add_token(token_type, literal)
     }
 
     fn advance(&mut self) -> char {

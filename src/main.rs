@@ -34,6 +34,7 @@ fn run_file(filename: &str) {
 }
 
 fn run_prompt() -> Result<(), Box<Error>> {
+    println!("{}", bin_expr);
     let mut interpreter = Interpreter::new();
     loop {
         let mut line = String::new();
