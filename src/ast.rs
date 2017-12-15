@@ -4,7 +4,7 @@ use token;
 pub enum Expr<'a> {
     Binary(Binary<'a>),
     Grouping(Grouping<'a>),
-    Literal(Literal<'a>),
+    Literal(Literal),
     Unary(Unary<'a>)
 }
 
@@ -60,12 +60,12 @@ impl<'a> Grouping<'a> {
     }
 }
 
-pub struct Literal<'a> {
-    pub value: &'a token::Literal
+pub struct Literal {
+    pub value: Box<token::Literal>
 }
 
-impl<'a> Literal<'a> {
-    pub fn new(value: &'a token::Literal) -> Literal<'a> {
+impl Literal {
+    pub fn new(value: Box<token::Literal>) -> Literal {
         Literal { value }
     }
 }
