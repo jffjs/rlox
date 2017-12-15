@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use ast;
-use token::{Literal, Token, TokenType};
+use token::{Token, TokenType};
 
 #[derive(Debug)]
 pub struct ParseError {
@@ -32,165 +32,154 @@ impl ParseError {
 }
 
 pub struct Parser {
-    current: usize,
     tokens: Vec<Token>
 }
 
 impl Parser {
-    fn expression(&self, mut current: usize) -> Result<ast::Expr, Box<Error>> {
-        self.equality(current)
+    fn expression(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
+        self.equality(idx)
     }
 
-    fn equality(&self, mut current: usize) -> Result<ast::Expr, Box<Error>> {
-        let mut expr = self.comparison(current);
+    fn equality(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
+        let mut expr = self.comparison(idx);
 
-        while self.match_next(current, vec![TokenType::BangEqual, TokenType::EqualEqual]) {
-            current += 1;
-            let right = self.comparison(current).unwrap();
-            let operator = self.previous(current);
-            expr = Ok(ast::Expr::Binary(
-                ast::Binary::new(
-                    Box::new(expr.unwrap()),
-                    operator,
-                    Box::new(right)
-                )
-            ));
-
+        loop {
+            let (idx, matched) = self.match_next(idx, vec![TokenType::BangEqual, TokenType::EqualEqual]);
+            if matched {
+                let right = self.comparison(idx).unwrap();
+                let operator = self.previous(idx);
+                expr = Ok(ast::Expr::binary(expr.unwrap(), operator, right));
+            } else {
+                break;
+            }
         }
         expr
     }
 
-    fn comparison(&self, mut current: usize) -> Result<ast::Expr, Box<Error>> {
-        let mut expr = self.addition(current);
+    fn comparison(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
+        let mut expr = self.addition(idx);
 
-        while self.match_next(current, vec![TokenType::Greater, TokenType::GreaterEqual,
-                                   TokenType::Less, TokenType::LessEqual]) {
-            current += 1;
-            let right = self.addition(current).unwrap();
-            let operator = self.previous(current);
-            expr = Ok(ast::Expr::Binary(
-                ast::Binary::new(
-                    Box::new(expr.unwrap()),
-                    operator,
-                    Box::new(right)
-                )
-            ));
+        loop {
+            let (idx, matched) = self.match_next(idx, vec![TokenType::Greater, TokenType::GreaterEqual,
+                                                            TokenType::Less, TokenType::LessEqual]);
+            if matched {
+                let right = self.addition(idx).unwrap();
+                let operator = self.previous(idx);
+                expr = Ok(ast::Expr::binary(expr.unwrap(), operator, right));
+            } else {
+                break;
+            }
         }
         expr
     }
 
-    fn addition(&self, mut current: usize) -> Result<ast::Expr, Box<Error>> {
-        let mut expr = self.multiplication(current);
+    fn addition(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
+        let mut expr = self.multiplication(idx);
 
-        while self.match_next(current, vec![TokenType::Plus, TokenType::Minus]) {
-            current += 1;
-            let right = self.multiplication(current).unwrap();
-            let operator = self.previous(current);
-            expr = Ok(ast::Expr::Binary(
-                ast::Binary::new(
-                    Box::new(expr.unwrap()),
-                    operator,
-                    Box::new(right)
-                )
-            ));
+        loop {
+            let (idx, matched) = self.match_next(idx, vec![TokenType::Plus, TokenType::Minus]);
+            if matched {
+                let right = self.multiplication(idx).unwrap();
+                let operator = self.previous(idx);
+                expr = Ok(ast::Expr::binary(expr.unwrap(), operator, right));
+            } else {
+                break;
+            }
         }
         expr
     }
 
-    fn multiplication(&self, mut current: usize) -> Result<ast::Expr, Box<Error>> {
-        let mut expr = self.unary(current);
+    fn multiplication(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
+        let mut expr = self.unary(idx);
 
-        while self.match_next(current, vec![TokenType::Star, TokenType::Slash]) {
-            current += 1;
-            let right = self.unary(current).unwrap();
-            let operator = self.previous(current);
-            expr = Ok(ast::Expr::Binary(
-                ast::Binary::new(
-                    Box::new(expr.unwrap()),
-                    operator,
-                    Box::new(right)
-                )
-            ));
+        loop {
+            let (idx, matched) = self.match_next(idx, vec![TokenType::Star, TokenType::Slash]);
+            if matched {
+                let right = self.unary(idx).unwrap();
+                let operator = self.previous(idx);
+                expr = Ok(ast::Expr::binary(expr.unwrap(), operator, right));
+            } else {
+                break;
+            }
         }
         expr
     }
 
-    fn unary(&self, mut current: usize) -> Result<ast::Expr, Box<Error>> {
-        if self.match_next(current, vec![TokenType::Bang, TokenType::Minus]) {
-            current += 1;
-            let operator = self.previous(current);
-            let right = self.unary(current).unwrap();
-            return Ok(ast::Expr::Unary(ast::Unary::new(operator, Box::new(right))));
+    fn unary(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
+        let (idx, matched) = self.match_next(idx, vec![TokenType::Bang, TokenType::Minus]);
+        if matched {
+            let operator = self.previous(idx);
+            let right = self.unary(idx).unwrap();
+            return Ok(ast::Expr::unary(operator, right));
         }
-
-        self.primary(current)
+        self.primary(idx)
     }
 
-    fn primary(&self, mut current: usize) -> Result<ast::Expr, Box<Error>> {
-        if self.match_next(current, vec![TokenType::False, TokenType::True, TokenType::Nil,
-                           TokenType::Number, TokenType::String]) {
-            current += 1;
-            let tok_literal = self.peek(current);
-            let literal = Box::new(tok_literal.literal.clone().unwrap());
-            return Ok(ast::Expr::Literal(ast::Literal::new(literal)));
+    fn primary(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
+        let (idx, lit_match) = self.match_next(idx, vec![TokenType::False, TokenType::True, TokenType::Nil,
+                                                          TokenType::Number, TokenType::String]);
+        if lit_match {
+            let tok_literal = self.peek(idx);
+            let literal = tok_literal.literal.clone().unwrap();
+            return Ok(ast::Expr::literal(literal));
         }
 
-        if self.match_next(current, vec![TokenType::LeftParen]) {
-            current += 1;
-            let expr = self.expression(current).unwrap();
-            return match self.consume(current, TokenType::RightParen, "Expect ')' after expression.") {
-                Ok(_) => Ok(ast::Expr::Grouping(ast::Grouping::new(Box::new(expr)))),
+        let (idx, grouping_match) = self.match_next(idx, vec![TokenType::LeftParen]);
+        if grouping_match {
+            let expr = self.expression(idx).unwrap();
+            return match self.consume(idx, TokenType::RightParen, "Expect ')' after expression.") {
+                Ok(_) => Ok(ast::Expr::grouping(expr)),
                 Err(e) => Err(e)
             };
         }
 
-        let tok = self.peek(current);
+        let tok = self.peek(idx);
         Err(Box::new(ParseError::new(tok.line, String::from("Unexpected parse error."))))
     }
 
-    fn match_next(&self, current: usize, token_types: Vec<TokenType>) -> bool {
+    fn match_next(&self, idx: usize, token_types: Vec<TokenType>) -> (usize, bool) {
         for t_type in token_types {
-            if self.check(current, t_type) {
-                return true;
+            if self.check(idx, t_type) {
+                return (idx + 1, true);
             }
         }
-        false
+        (idx, false)
     }
 
-    fn check(&self, current: usize, token_type: TokenType) -> bool {
-        if self.is_at_end(current) {
+    fn check(&self, idx: usize, token_type: TokenType) -> bool {
+        if self.is_at_end(idx) {
             false
         } else {
-            self.peek(current).token_type == token_type
+            self.peek(idx).token_type == token_type
         }
     }
 
-    fn consume(&self, current: usize, t_type: TokenType, err: &str) -> Result<usize, Box<Error>> {
-        if self.check(current, t_type) {
-            Ok(current + 1)
+    fn consume(&self, idx: usize, t_type: TokenType, err: &str) -> Result<usize, Box<Error>> {
+        if self.check(idx, t_type) {
+            Ok(idx + 1)
         } else {
-            let tok = self.peek(current);
+            let tok = self.peek(idx);
             Err(Box::new(ParseError::new(tok.line, err.to_string())))
         }
     }
 
     // fn advance(&mut self) -> &Token {
     //     if self.is_at_end() {
-    //         self.current += 1;
+    //         self.idx += 1;
     //     }
     //     self.previous()
     // }
 
-    fn is_at_end(&self, current: usize) -> bool {
-        self.peek(current).token_type == TokenType::Eof
+    fn is_at_end(&self, idx: usize) -> bool {
+        self.peek(idx).token_type == TokenType::Eof
     }
 
-    fn peek(&self, current: usize) -> &Token {
-        &self.tokens[current]
+    fn peek(&self, idx: usize) -> &Token {
+        &self.tokens[idx]
     }
 
-    fn previous(&self, current: usize) -> &Token {
-        &self.tokens[current - 1]
+    fn previous(&self, idx: usize) -> &Token {
+        &self.tokens[idx - 1]
     }
 
 }

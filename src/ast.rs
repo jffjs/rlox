@@ -27,6 +27,30 @@ impl<'a> fmt::Display for Expr<'a> {
     }
 }
 
+impl<'a> Expr<'a> {
+    pub fn binary(left: Expr<'a>, operator: &'a token::Token, right: Expr<'a>) -> Expr<'a> {
+        Expr::Binary(
+            Binary::new(
+                Box::new(left),
+                operator,
+                Box::new(right)
+            )
+        )
+    }
+
+    pub fn unary(operator: &'a token::Token, right: Expr<'a>) -> Expr<'a> {
+        Expr::Unary(Unary::new(operator, Box::new(right)))
+    }
+
+    pub fn literal(lit: token::Literal) -> Expr<'a> {
+        Expr::Literal(Literal::new(lit))
+    }
+
+    pub fn grouping(expr: Expr) -> Expr {
+        Expr::Grouping(Grouping::new(Box::new(expr)))
+    }
+}
+
 fn parenthesize(name: &str, exprs: Vec<&Box<Expr>>) -> String {
     let mut result = String::from("(");
     result.push_str(name);
@@ -45,7 +69,7 @@ pub struct Binary<'a> {
 }
 
 impl<'a> Binary<'a> {
-    pub fn new(left: Box<Expr<'a>>, operator: &'a token::Token, right: Box<Expr<'a>>) -> Binary<'a> {
+    fn new(left: Box<Expr<'a>>, operator: &'a token::Token, right: Box<Expr<'a>>) -> Binary<'a> {
         Binary { left, operator, right}
     }
 }
@@ -61,11 +85,11 @@ impl<'a> Grouping<'a> {
 }
 
 pub struct Literal {
-    pub value: Box<token::Literal>
+    pub value: token::Literal
 }
 
 impl Literal {
-    pub fn new(value: Box<token::Literal>) -> Literal {
+    fn new(value: token::Literal) -> Literal {
         Literal { value }
     }
 }
@@ -76,7 +100,7 @@ pub struct Unary<'a> {
 }
 
 impl<'a> Unary<'a> {
-    pub fn new(operator: &'a token::Token, right: Box<Expr<'a>>) -> Unary<'a> {
+    fn new(operator: &'a token::Token, right: Box<Expr<'a>>) -> Unary<'a> {
         Unary { operator, right }
     }
 }
