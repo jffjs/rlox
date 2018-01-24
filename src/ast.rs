@@ -1,6 +1,7 @@
 use std::fmt;
 use token;
 
+#[derive(Debug)]
 pub enum Expr<'a> {
     Binary(Binary<'a>),
     Grouping(Grouping<'a>),
@@ -62,6 +63,7 @@ fn parenthesize(name: &str, exprs: Vec<&Box<Expr>>) -> String {
     result
 }
 
+#[derive(Debug)]
 pub struct Binary<'a> {
     pub left: Box<Expr<'a>>,
     pub operator: &'a token::Token,
@@ -74,6 +76,7 @@ impl<'a> Binary<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct Grouping<'a> {
     pub expression: Box<Expr<'a>>
 }
@@ -84,6 +87,7 @@ impl<'a> Grouping<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct Literal {
     pub value: token::Literal
 }
@@ -94,6 +98,7 @@ impl Literal {
     }
 }
 
+#[derive(Debug)]
 pub struct Unary<'a> {
     pub operator: &'a token::Token,
     pub right: Box<Expr<'a>>

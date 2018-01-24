@@ -64,7 +64,7 @@ impl Scanner {
         Scanner { source, source_len, tokens, keywords, start: 0, current: 0, line: 1 }
     }
 
-    pub fn scan_tokens(&mut self) -> Result<(), Vec<Box<Error>>> {
+    pub fn scan_tokens(mut self) -> Result<Vec<Token>, Vec<Box<Error>>> {
         let mut errors: Vec<Box<Error>> = vec![];
 
         while !self.is_at_end() {
@@ -86,7 +86,7 @@ impl Scanner {
             Err(errors)
         } else {
             println!("{:?}", self.tokens);
-            Ok(())
+            Ok(self.tokens)
         }
     }
 

@@ -1,10 +1,14 @@
 mod scanner;
-mod parser;
+// mod parser;
+mod parser2;
 mod token;
 mod ast;
 
 use std::error::Error;
 use std::fmt;
+// use ast::Expr;
+// use parser::Parser;
+use parser2::parse;
 use scanner::Scanner;
 
 pub struct Interpreter;
@@ -14,14 +18,27 @@ impl Interpreter {
         Interpreter
     }
 
-    pub fn run(&mut self, source: String) -> Result<(), LoxError> {
-        let mut scanner = Scanner::new(source);
+    pub fn run(&mut self, source: String) -> Result<String, LoxError> {
+        let scanner = Scanner::new(source);
+
         match scanner.scan_tokens() {
             Err(errors) => {
                 Interpreter::report_errors(errors);
                 Err(LoxError)
             },
-            _ => Ok(())
+            Ok(tokens) => {
+                // let parser = Parser::new(&tokens);
+                match parse(&tokens) {
+                    Ok(expr) => {
+                        println!("{:?}", expr);
+                        Ok(expr.to_string())
+                    },
+                    Err(error) => {
+                        Interpreter::report_errors(vec![error]);
+                        Err(LoxError)
+                    }
+                }
+            }
         }
     }
 

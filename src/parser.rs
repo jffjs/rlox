@@ -6,7 +6,8 @@ use token::{Token, TokenType};
 #[derive(Debug)]
 pub struct ParseError {
     msg: String,
-    line: u32
+    line: u32,
+    lexeme: String
 }
 
 impl fmt::Display for ParseError {
@@ -26,21 +27,31 @@ impl Error for ParseError {
 }
 
 impl ParseError {
-    fn new(line: u32, msg: String) -> ParseError {
-        ParseError { line, msg }
+    fn new(line: u32, lexeme: String, msg: String) -> ParseError {
+        ParseError { line, lexeme, msg }
     }
 }
 
-pub struct Parser {
-    tokens: Vec<Token>
+pub struct Parser<'a> {
+    tokens: &'a Vec<Token>
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
+    pub fn new(tokens: &Vec<Token>) -> Parser {
+        Parser { tokens }
+    }
+
+    pub fn parse(&self) -> Result<ast::Expr, Box<Error>> {
+        self.expression(0)
+    }
+
     fn expression(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
+        println!("{}", idx);
         self.equality(idx)
     }
 
     fn equality(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
+        println!("{}", idx);
         let mut expr = self.comparison(idx);
 
         loop {
@@ -57,6 +68,7 @@ impl Parser {
     }
 
     fn comparison(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
+        println!("{}", idx);
         let mut expr = self.addition(idx);
 
         loop {
@@ -74,6 +86,7 @@ impl Parser {
     }
 
     fn addition(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
+        println!("{}", idx);
         let mut expr = self.multiplication(idx);
 
         loop {
@@ -90,6 +103,7 @@ impl Parser {
     }
 
     fn multiplication(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
+        println!("{}", idx);
         let mut expr = self.unary(idx);
 
         loop {
@@ -106,6 +120,7 @@ impl Parser {
     }
 
     fn unary(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
+        println!("{}", idx);
         let (idx, matched) = self.match_next(idx, vec![TokenType::Bang, TokenType::Minus]);
         if matched {
             let operator = self.previous(idx);
@@ -116,11 +131,15 @@ impl Parser {
     }
 
     fn primary(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
-        let (idx, lit_match) = self.match_next(idx, vec![TokenType::False, TokenType::True, TokenType::Nil,
+        println!("{}", idx);
+        let (_, lit_match) = self.match_next(idx, vec![TokenType::False, TokenType::True, TokenType::Nil,
                                                           TokenType::Number, TokenType::String]);
         if lit_match {
             let tok_literal = self.peek(idx);
+            println!("{}, {}", idx, tok_literal);
+            println!("before literal unwrap");
             let literal = tok_literal.literal.clone().unwrap();
+            println!("after literal unwrap");
             return Ok(ast::Expr::literal(literal));
         }
 
@@ -134,7 +153,7 @@ impl Parser {
         }
 
         let tok = self.peek(idx);
-        Err(Box::new(ParseError::new(tok.line, String::from("Unexpected parse error."))))
+        Err(Box::new(ParseError::new(tok.line, tok.lexeme.clone(), String::from("Expect expression."))))
     }
 
     fn match_next(&self, idx: usize, token_types: Vec<TokenType>) -> (usize, bool) {
@@ -159,16 +178,9 @@ impl Parser {
             Ok(idx + 1)
         } else {
             let tok = self.peek(idx);
-            Err(Box::new(ParseError::new(tok.line, err.to_string())))
+            Err(Box::new(ParseError::new(tok.line, tok.lexeme.clone(), err.to_string())))
         }
     }
-
-    // fn advance(&mut self) -> &Token {
-    //     if self.is_at_end() {
-    //         self.idx += 1;
-    //     }
-    //     self.previous()
-    // }
 
     fn is_at_end(&self, idx: usize) -> bool {
         self.peek(idx).token_type == TokenType::Eof
@@ -179,7 +191,32 @@ impl Parser {
     }
 
     fn previous(&self, idx: usize) -> &Token {
-        &self.tokens[idx - 1]
+        &self.peek(idx - 1)
+    }
+
+    fn advance(&self, mut idx: usize) -> (usize, &Token) {
+        if !self.is_at_end(idx) {
+            idx += 1;
+        }
+        (idx, self.previous(idx))
+    }
+
+    fn synchronize(&self, idx: usize) -> usize {
+        let (mut idx, _token) = self.advance(idx);
+
+        while !self.is_at_end(idx) {
+            if self.previous(idx).token_type == TokenType::Semicolon {
+                return idx;
+            }
+
+            match self.peek(idx).token_type {
+                TokenType::Class | TokenType::Fun | TokenType::Var | TokenType::For |
+                TokenType::If | TokenType::While | TokenType::Print | TokenType::Return => return idx,
+                _ => ()
+            }
+            idx = self.advance(idx).0;
+        }
+        idx
     }
 
 }

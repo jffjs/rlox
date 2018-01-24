@@ -18,6 +18,7 @@ fn main() {
     } else {
         run_prompt().unwrap_or_else(|err| {
             eprintln!("{}", err);
+            String::from("")
         });
     }
 }
@@ -33,15 +34,17 @@ fn run_file(filename: &str) {
     }
 }
 
-fn run_prompt() -> Result<(), Box<Error>> {
-    println!("{}", bin_expr);
+fn run_prompt() -> Result<String, Box<Error>> {
     let mut interpreter = Interpreter::new();
     loop {
         let mut line = String::new();
         print!(">");
         io::stdout().flush().unwrap();
         io::stdin().read_line(&mut line)?;
-        interpreter.run(line).unwrap_or(())
+        match interpreter.run(line) {
+            Ok(expr) => println!("{}", expr),
+            Err(_) => println!("An error occurred.")
+        }
     }
 }
 
