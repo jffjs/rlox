@@ -26,7 +26,7 @@ impl Interpreter {
             Ok(tokens) => {
                 match parse(&tokens) {
                     Ok(expr) => {
-                        Ok(expr.to_string())
+                        Ok(expr.evaluate().to_string())
                     },
                     Err(error) => {
                         Interpreter::report_errors(vec![error]);
