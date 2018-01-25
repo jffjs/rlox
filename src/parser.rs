@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use ast;
-use token::{Token, TokenType};
+use token::{Literal, Token, TokenType};
 
 #[derive(Debug)]
 pub struct ParseError {
@@ -32,191 +32,167 @@ impl ParseError {
     }
 }
 
-pub struct Parser<'a> {
-    tokens: &'a Vec<Token>
+
+enum ParseResult<'a> {
+    Ok(ast::Expr<'a>, usize),
+    Err(&'a str, usize)
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(tokens: &Vec<Token>) -> Parser {
-        Parser { tokens }
+pub fn parse(tokens: &Vec<Token>) -> Result<ast::Expr, Box<Error>> {
+    match expression(tokens, 0) {
+        ParseResult::Ok(expr, _) => Ok(expr),
+        ParseResult::Err(msg, pos) => {
+            let token = &tokens[pos];
+            let error = ParseError::new(token.line, token.lexeme.clone(), String::from(msg));
+            Err(Box::new(error))
+        }
     }
+}
 
-    pub fn parse(&self) -> Result<ast::Expr, Box<Error>> {
-        self.expression(0)
-    }
+fn expression(tokens: &Vec<Token>, pos: usize) -> ParseResult {
+    equality(tokens, pos)
+}
 
-    fn expression(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
-        println!("{}", idx);
-        self.equality(idx)
-    }
-
-    fn equality(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
-        println!("{}", idx);
-        let mut expr = self.comparison(idx);
-
-        loop {
-            let (idx, matched) = self.match_next(idx, vec![TokenType::BangEqual, TokenType::EqualEqual]);
-            if matched {
-                let right = self.comparison(idx).unwrap();
-                let operator = self.previous(idx);
-                expr = Ok(ast::Expr::binary(expr.unwrap(), operator, right));
-            } else {
-                break;
+fn equality(tokens: &Vec<Token>, pos: usize) -> ParseResult {
+    match comparison(tokens, pos) {
+        ParseResult::Ok(mut expr, mut pos) => {
+            let mut next_tok = &tokens[pos];
+            while match_type(next_tok, vec![TokenType::BangEqual, TokenType::EqualEqual]) {
+                let operator = &tokens[pos];
+                match comparison(tokens, pos + 1) {
+                    ParseResult::Ok(right, next_pos) => {
+                        pos = next_pos;
+                        expr = ast::Expr::binary(expr, operator, right);
+                    },
+                    ParseResult::Err(msg, pos) => return ParseResult::Err(msg, pos)
+                }
+                next_tok = &tokens[pos];
             }
-        }
-        expr
+            ParseResult::Ok(expr, pos)
+        },
+        ParseResult::Err(msg, pos) => ParseResult::Err(msg, pos)
     }
+}
 
-    fn comparison(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
-        println!("{}", idx);
-        let mut expr = self.addition(idx);
-
-        loop {
-            let (idx, matched) = self.match_next(idx, vec![TokenType::Greater, TokenType::GreaterEqual,
-                                                            TokenType::Less, TokenType::LessEqual]);
-            if matched {
-                let right = self.addition(idx).unwrap();
-                let operator = self.previous(idx);
-                expr = Ok(ast::Expr::binary(expr.unwrap(), operator, right));
-            } else {
-                break;
+fn comparison(tokens: &Vec<Token>, pos: usize) -> ParseResult {
+    match addition(tokens, pos) {
+        ParseResult::Ok(mut expr, mut pos) => {
+            let mut next_tok = &tokens[pos];
+            while match_type(next_tok, vec![TokenType::Greater, TokenType::GreaterEqual,
+                                         TokenType::Less, TokenType::LessEqual]) {
+                let operator = &tokens[pos];
+                match addition(tokens, pos + 1) {
+                    ParseResult::Ok(right, next_pos) => {
+                        pos = next_pos;
+                        expr = ast::Expr::binary(expr, operator, right);
+                    },
+                    ParseResult::Err(msg, pos) => return ParseResult::Err(msg, pos)
+                }
+                next_tok = &tokens[pos];
             }
-        }
-        expr
+            ParseResult::Ok(expr, pos)
+        },
+        ParseResult::Err(msg, pos) => ParseResult::Err(msg, pos)
     }
+}
 
-    fn addition(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
-        println!("{}", idx);
-        let mut expr = self.multiplication(idx);
-
-        loop {
-            let (idx, matched) = self.match_next(idx, vec![TokenType::Plus, TokenType::Minus]);
-            if matched {
-                let right = self.multiplication(idx).unwrap();
-                let operator = self.previous(idx);
-                expr = Ok(ast::Expr::binary(expr.unwrap(), operator, right));
-            } else {
-                break;
+fn addition(tokens: &Vec<Token>, pos: usize) -> ParseResult {
+    match multiplication(tokens, pos) {
+        ParseResult::Ok(mut expr, mut pos) => {
+            let mut next_tok = &tokens[pos];
+            while match_type(next_tok, vec![TokenType::Plus, TokenType::Minus]) {
+                let operator = &tokens[pos];
+                match multiplication(tokens, pos + 1) {
+                    ParseResult::Ok(right, next_pos) => {
+                        pos = next_pos;
+                        expr = ast::Expr::binary(expr, operator, right);
+                    },
+                    ParseResult::Err(msg, pos) => return ParseResult::Err(msg, pos)
+                }
+                next_tok = &tokens[pos];
             }
-        }
-        expr
+            ParseResult::Ok(expr, pos)
+        },
+        ParseResult::Err(msg, pos) => ParseResult::Err(msg, pos)
     }
+}
 
-    fn multiplication(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
-        println!("{}", idx);
-        let mut expr = self.unary(idx);
-
-        loop {
-            let (idx, matched) = self.match_next(idx, vec![TokenType::Star, TokenType::Slash]);
-            if matched {
-                let right = self.unary(idx).unwrap();
-                let operator = self.previous(idx);
-                expr = Ok(ast::Expr::binary(expr.unwrap(), operator, right));
-            } else {
-                break;
+fn multiplication(tokens: &Vec<Token>, pos: usize) -> ParseResult {
+    match unary(tokens, pos) {
+        ParseResult::Ok(mut expr, mut pos) => {
+            let mut next_tok = &tokens[pos];
+            while match_type(next_tok, vec![TokenType::Star, TokenType::Slash]) {
+                let operator = &tokens[pos];
+                match unary(tokens, pos + 1) {
+                    ParseResult::Ok(right, next_pos) => {
+                        pos = next_pos;
+                        expr = ast::Expr::binary(expr, operator, right);
+                    },
+                    ParseResult::Err(msg, pos) => return ParseResult::Err(msg, pos)
+                }
+                next_tok = &tokens[pos];
             }
-        }
-        expr
+            ParseResult::Ok(expr, pos)
+        },
+        ParseResult::Err(msg, pos) => ParseResult::Err(msg, pos)
     }
+}
 
-    fn unary(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
-        println!("{}", idx);
-        let (idx, matched) = self.match_next(idx, vec![TokenType::Bang, TokenType::Minus]);
-        if matched {
-            let operator = self.previous(idx);
-            let right = self.unary(idx).unwrap();
-            return Ok(ast::Expr::unary(operator, right));
+fn unary(tokens: &Vec<Token>, pos: usize) -> ParseResult {
+    let next_tok = &tokens[pos];
+    if match_type(next_tok, vec![TokenType::Bang, TokenType::Minus]) {
+        let operator = &tokens[pos];
+        match unary(tokens, pos + 1) {
+            ParseResult::Ok(right, pos) =>
+                ParseResult::Ok(ast::Expr::unary(operator, right), pos),
+            ParseResult::Err(msg, pos) =>
+                ParseResult::Err(msg, pos)
         }
-        self.primary(idx)
+    } else {
+        primary(tokens, pos)
     }
+}
 
-    fn primary(&self, idx: usize) -> Result<ast::Expr, Box<Error>> {
-        println!("{}", idx);
-        let (_, lit_match) = self.match_next(idx, vec![TokenType::False, TokenType::True, TokenType::Nil,
-                                                          TokenType::Number, TokenType::String]);
-        if lit_match {
-            let tok_literal = self.peek(idx);
-            println!("{}, {}", idx, tok_literal);
-            println!("before literal unwrap");
-            let literal = tok_literal.literal.clone().unwrap();
-            println!("after literal unwrap");
-            return Ok(ast::Expr::literal(literal));
-        }
-
-        let (idx, grouping_match) = self.match_next(idx, vec![TokenType::LeftParen]);
-        if grouping_match {
-            let expr = self.expression(idx).unwrap();
-            return match self.consume(idx, TokenType::RightParen, "Expect ')' after expression.") {
-                Ok(_) => Ok(ast::Expr::grouping(expr)),
-                Err(e) => Err(e)
-            };
-        }
-
-        let tok = self.peek(idx);
-        Err(Box::new(ParseError::new(tok.line, tok.lexeme.clone(), String::from("Expect expression."))))
-    }
-
-    fn match_next(&self, idx: usize, token_types: Vec<TokenType>) -> (usize, bool) {
-        for t_type in token_types {
-            if self.check(idx, t_type) {
-                return (idx + 1, true);
+fn primary(tokens: &Vec<Token>, pos: usize) -> ParseResult {
+    let token = &tokens[pos];
+    match token.token_type {
+        TokenType::False =>
+            ParseResult::Ok(ast::Expr::literal(Literal::False), pos + 1),
+        TokenType::True =>
+            ParseResult::Ok(ast::Expr::literal(Literal::True), pos + 1),
+        TokenType::Nil =>
+            ParseResult::Ok(ast::Expr::literal(Literal::Nil), pos + 1),
+        TokenType::Number | TokenType::String => {
+            match token.literal.clone() {
+                Some(literal) =>
+                    ParseResult::Ok(ast::Expr::literal(literal), pos + 1),
+                None =>
+                    ParseResult::Err("Expect literal value.", pos)
             }
-        }
-        (idx, false)
-    }
-
-    fn check(&self, idx: usize, token_type: TokenType) -> bool {
-        if self.is_at_end(idx) {
-            false
-        } else {
-            self.peek(idx).token_type == token_type
-        }
-    }
-
-    fn consume(&self, idx: usize, t_type: TokenType, err: &str) -> Result<usize, Box<Error>> {
-        if self.check(idx, t_type) {
-            Ok(idx + 1)
-        } else {
-            let tok = self.peek(idx);
-            Err(Box::new(ParseError::new(tok.line, tok.lexeme.clone(), err.to_string())))
-        }
-    }
-
-    fn is_at_end(&self, idx: usize) -> bool {
-        self.peek(idx).token_type == TokenType::Eof
-    }
-
-    fn peek(&self, idx: usize) -> &Token {
-        &self.tokens[idx]
-    }
-
-    fn previous(&self, idx: usize) -> &Token {
-        &self.peek(idx - 1)
-    }
-
-    fn advance(&self, mut idx: usize) -> (usize, &Token) {
-        if !self.is_at_end(idx) {
-            idx += 1;
-        }
-        (idx, self.previous(idx))
-    }
-
-    fn synchronize(&self, idx: usize) -> usize {
-        let (mut idx, _token) = self.advance(idx);
-
-        while !self.is_at_end(idx) {
-            if self.previous(idx).token_type == TokenType::Semicolon {
-                return idx;
+        },
+        TokenType::LeftParen => {
+            match expression(tokens, pos + 1) {
+                ParseResult::Ok(expr, pos) => {
+                    match (&tokens[pos]).token_type {
+                        TokenType::RightParen =>
+                            ParseResult::Ok(ast::Expr::grouping(expr), pos + 1),
+                        _ => ParseResult::Err("Expect ')' after expression.", pos)
+                    }
+                },
+                ParseResult::Err(msg, pos) => ParseResult::Err(msg, pos)
             }
-
-            match self.peek(idx).token_type {
-                TokenType::Class | TokenType::Fun | TokenType::Var | TokenType::For |
-                TokenType::If | TokenType::While | TokenType::Print | TokenType::Return => return idx,
-                _ => ()
-            }
-            idx = self.advance(idx).0;
-        }
-        idx
+        },
+        _ => ParseResult::Err("Expect expression", pos)
     }
+}
 
+fn match_type(token: &Token, tok_types: Vec<TokenType>) -> bool {
+    for tok_type in tok_types {
+        if token.token_type == TokenType::Eof {
+            return false;
+        } else if token.token_type == tok_type {
+            return true;
+        }
+    }
+    false
 }

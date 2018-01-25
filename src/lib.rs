@@ -1,14 +1,11 @@
 mod scanner;
-// mod parser;
-mod parser2;
+mod parser;
 mod token;
 mod ast;
 
 use std::error::Error;
 use std::fmt;
-// use ast::Expr;
-// use parser::Parser;
-use parser2::parse;
+use parser::parse;
 use scanner::Scanner;
 
 pub struct Interpreter;
@@ -27,10 +24,8 @@ impl Interpreter {
                 Err(LoxError)
             },
             Ok(tokens) => {
-                // let parser = Parser::new(&tokens);
                 match parse(&tokens) {
                     Ok(expr) => {
-                        println!("{:?}", expr);
                         Ok(expr.to_string())
                     },
                     Err(error) => {

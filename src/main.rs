@@ -1,7 +1,6 @@
 extern crate rlox;
 
 use std::env;
-use std::error::Error;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::process;
@@ -16,10 +15,7 @@ fn main() {
         let filename = &args[1];
         run_file(filename);
     } else {
-        run_prompt().unwrap_or_else(|err| {
-            eprintln!("{}", err);
-            String::from("")
-        });
+        run_prompt()
     }
 }
 
@@ -34,16 +30,18 @@ fn run_file(filename: &str) {
     }
 }
 
-fn run_prompt() -> Result<String, Box<Error>> {
+fn run_prompt() {
     let mut interpreter = Interpreter::new();
     loop {
         let mut line = String::new();
         print!(">");
         io::stdout().flush().unwrap();
-        io::stdin().read_line(&mut line)?;
-        match interpreter.run(line) {
-            Ok(expr) => println!("{}", expr),
-            Err(_) => println!("An error occurred.")
+        match io::stdin().read_line(&mut line) {
+            Ok(_) => match interpreter.run(line) {
+                Ok(expr) => println!("{}", expr),
+                Err(_) => ()
+            },
+            Err(e) => panic!(e)
         }
     }
 }

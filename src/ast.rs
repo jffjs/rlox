@@ -3,10 +3,10 @@ use token;
 
 #[derive(Debug)]
 pub enum Expr<'a> {
-    Binary(Binary<'a>),
-    Grouping(Grouping<'a>),
-    Literal(Literal),
-    Unary(Unary<'a>)
+    Binary(BinaryExpr<'a>),
+    Grouping(GroupingExpr<'a>),
+    Literal(LiteralExpr),
+    Unary(UnaryExpr<'a>)
 }
 
 impl<'a> fmt::Display for Expr<'a> {
@@ -31,7 +31,7 @@ impl<'a> fmt::Display for Expr<'a> {
 impl<'a> Expr<'a> {
     pub fn binary(left: Expr<'a>, operator: &'a token::Token, right: Expr<'a>) -> Expr<'a> {
         Expr::Binary(
-            Binary::new(
+            BinaryExpr::new(
                 Box::new(left),
                 operator,
                 Box::new(right)
@@ -40,15 +40,15 @@ impl<'a> Expr<'a> {
     }
 
     pub fn unary(operator: &'a token::Token, right: Expr<'a>) -> Expr<'a> {
-        Expr::Unary(Unary::new(operator, Box::new(right)))
+        Expr::Unary(UnaryExpr::new(operator, Box::new(right)))
     }
 
     pub fn literal(lit: token::Literal) -> Expr<'a> {
-        Expr::Literal(Literal::new(lit))
+        Expr::Literal(LiteralExpr::new(lit))
     }
 
     pub fn grouping(expr: Expr) -> Expr {
-        Expr::Grouping(Grouping::new(Box::new(expr)))
+        Expr::Grouping(GroupingExpr::new(Box::new(expr)))
     }
 }
 
@@ -64,49 +64,49 @@ fn parenthesize(name: &str, exprs: Vec<&Box<Expr>>) -> String {
 }
 
 #[derive(Debug)]
-pub struct Binary<'a> {
+pub struct BinaryExpr<'a> {
     pub left: Box<Expr<'a>>,
     pub operator: &'a token::Token,
     pub right: Box<Expr<'a>>
 }
 
-impl<'a> Binary<'a> {
-    fn new(left: Box<Expr<'a>>, operator: &'a token::Token, right: Box<Expr<'a>>) -> Binary<'a> {
-        Binary { left, operator, right}
+impl<'a> BinaryExpr<'a> {
+    fn new(left: Box<Expr<'a>>, operator: &'a token::Token, right: Box<Expr<'a>>) -> BinaryExpr<'a> {
+        BinaryExpr { left, operator, right}
     }
 }
 
 #[derive(Debug)]
-pub struct Grouping<'a> {
+pub struct GroupingExpr<'a> {
     pub expression: Box<Expr<'a>>
 }
 
-impl<'a> Grouping<'a> {
-    pub fn new(expression: Box<Expr<'a>>) -> Grouping<'a> {
-        Grouping { expression }
+impl<'a> GroupingExpr<'a> {
+    pub fn new(expression: Box<Expr<'a>>) -> GroupingExpr<'a> {
+        GroupingExpr { expression }
     }
 }
 
 #[derive(Debug)]
-pub struct Literal {
+pub struct LiteralExpr {
     pub value: token::Literal
 }
 
-impl Literal {
-    fn new(value: token::Literal) -> Literal {
-        Literal { value }
+impl LiteralExpr {
+    fn new(value: token::Literal) -> LiteralExpr {
+        LiteralExpr { value }
     }
 }
 
 #[derive(Debug)]
-pub struct Unary<'a> {
+pub struct UnaryExpr<'a> {
     pub operator: &'a token::Token,
     pub right: Box<Expr<'a>>
 }
 
-impl<'a> Unary<'a> {
-    fn new(operator: &'a token::Token, right: Box<Expr<'a>>) -> Unary<'a> {
-        Unary { operator, right }
+impl<'a> UnaryExpr<'a> {
+    fn new(operator: &'a token::Token, right: Box<Expr<'a>>) -> UnaryExpr<'a> {
+        UnaryExpr { operator, right }
     }
 }
 

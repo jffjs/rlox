@@ -85,7 +85,6 @@ impl Scanner {
         if errors.len() > 0 {
             Err(errors)
         } else {
-            println!("{:?}", self.tokens);
             Ok(self.tokens)
         }
     }
