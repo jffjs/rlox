@@ -2,6 +2,7 @@ mod scanner;
 mod parser;
 mod token;
 mod ast;
+mod eval;
 
 use std::error::Error;
 use std::fmt;
@@ -26,7 +27,13 @@ impl Interpreter {
             Ok(tokens) => {
                 match parse(&tokens) {
                     Ok(expr) => {
-                        Ok(expr.evaluate().to_string())
+                        match expr.evaluate() {
+                            Ok(result) => Ok(result.to_string()),
+                            Err(error) => {
+                                Interpreter::report_errors(vec![Box::new(error)]);
+                                Err(LoxError)
+                            }
+                        }
                     },
                     Err(error) => {
                         Interpreter::report_errors(vec![error]);
