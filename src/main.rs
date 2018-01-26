@@ -22,11 +22,21 @@ fn main() {
 fn run_file(filename: &str) {
     let mut interpreter = Interpreter::new();
     let mut source = String::new();
-    let mut f = File::open(filename).unwrap();
-    f.read_to_string(&mut source).unwrap();
-    match interpreter.run(source) {
-        Err(_) => process::exit(65),
-        _ => ()
+    match File::open(filename) {
+        Ok(mut f) => match f.read_to_string(&mut source) {
+            Ok(_) => match interpreter.run(source) {
+                Ok(output) => println!("{}", output),
+                Err(_) => process::exit(70)
+            },
+            Err(e) => {
+                eprintln!("{}", e);
+                process::exit(65);
+            }
+        },
+        Err(e) => {
+            eprintln!("{}", e);
+            process::exit(65);
+        }
     }
 }
 
@@ -38,7 +48,7 @@ fn run_prompt() {
         io::stdout().flush().unwrap();
         match io::stdin().read_line(&mut line) {
             Ok(_) => match interpreter.run(line) {
-                Ok(expr) => println!("{}", expr),
+                Ok(output) => println!("{}", output),
                 Err(_) => ()
             },
             Err(e) => panic!(e)

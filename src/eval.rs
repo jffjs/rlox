@@ -35,34 +35,24 @@ impl<'a> ast::Expr<'a> {
             ast::Expr::Grouping(group_expr) => group_expr.expression.evaluate(),
             ast::Expr::Unary(unary_expr) => {
                 let right = unary_expr.right.evaluate()?;
-                let operator = unary_expr.operator.token_type;
-                match right {
-                    ExprResult::Number(n) => {
-                        match operator {
-                            token::TokenType::Minus => Ok(ExprResult::Number(-n)),
-                            _ => panic!("Invalid unary expression found.")
-                        }
+                let operator = unary_expr.operator;
+                match operator.token_type {
+                    token::TokenType::Minus => match right {
+                        ExprResult::Number(n) => Ok(ExprResult::Number(-n)),
+                        _ => runtime_error(&operator, "Operand must be a number.")
                     },
-                    _ => {
-                        match operator {
-                            token::TokenType::Bang => Ok(ExprResult::Boolean(!is_truthy(right))),
-                            _ => runtime_error(&unary_expr.operator, "Operand must be a number.")
-                        }
-                    }
+                    token::TokenType::Bang => Ok(ExprResult::Boolean(!is_truthy(right))),
+                    _ => panic!("Invalid unary expression. Check parser.")
                 }
             },
             ast::Expr::Binary(bin_expr) => {
                 let left = bin_expr.left.evaluate();
                 let right = bin_expr.right.evaluate();
-                let operator = bin_expr.operator.token_type;
-                eval_binary_expr(operator, left?, right?)
+                let operator = bin_expr.operator;
+                eval_binary_expr(&operator, left?, right?)
             }
         }
     }
-}
-
-fn runtime_error(token: &token::Token, msg: &str) -> Result<ExprResult, RuntimeError> {
-    Result::Err(RuntimeError::new(token.line, String::from(msg)))
 }
 
 fn is_truthy(val: ExprResult) -> bool {
@@ -94,15 +84,15 @@ fn is_equal(a: ExprResult, b: ExprResult) -> bool {
     }
 }
 
-fn eval_binary_expr<'a>(operator: token::TokenType,
+fn eval_binary_expr<'a>(operator: &token::Token,
                         left: ExprResult,
                         right: ExprResult) -> Result<ExprResult, RuntimeError> {
-    match operator {
+    match operator.token_type {
         token::TokenType::EqualEqual => Ok(ExprResult::Boolean(is_equal(left, right))),
         token::TokenType::BangEqual => Ok(ExprResult::Boolean(!is_equal(left, right))),
         _ => match left {
             ExprResult::Number(l_num) => match right {
-                ExprResult::Number(r_num) => match operator {
+                ExprResult::Number(r_num) => match operator.token_type {
                     token::TokenType::Plus => Ok(ExprResult::Number(l_num + r_num)),
                     token::TokenType::Minus => Ok(ExprResult::Number(l_num - r_num)),
                     token::TokenType::Star => Ok(ExprResult::Number(l_num * r_num)),
@@ -111,18 +101,18 @@ fn eval_binary_expr<'a>(operator: token::TokenType,
                     token::TokenType::GreaterEqual => Ok(ExprResult::Boolean(l_num >= r_num)),
                     token::TokenType::Less => Ok(ExprResult::Boolean(l_num < r_num)),
                     token::TokenType::LessEqual => Ok(ExprResult::Boolean(l_num <= r_num)),
-                    _ => panic!("Invalid operator.")
+                    _ => panic!("Invalid binary expression. Check parser")
                 },
-                _ => panic!("Invalid right operand.")
+                _ => runtime_error(operator, "Right operand must be a Number.")
             },
             ExprResult::String(l_str) => match right {
-                ExprResult::String(r_str) => match operator {
+                ExprResult::String(r_str) => match operator.token_type {
                     token::TokenType::Plus => Ok(ExprResult::String(format!("{}{}", l_str, r_str))),
-                    _ => panic!("Invalid operator.")
+                    _ => panic!("Invalid binary expression. Check parser")
                 },
-                _ => panic!("Invalid right operand.")
+                _ => runtime_error(operator, "Right operand must be a String.")
             },
-            _ => panic!("Invalid left operand.")
+            _ => runtime_error(operator, "Left operand must be a Number or a String.")
         }
 
     }
@@ -154,4 +144,8 @@ impl Error for RuntimeError {
     fn cause(&self) -> Option<&Error> {
         None
     }
+}
+
+fn runtime_error(token: &token::Token, msg: &str) -> Result<ExprResult, RuntimeError> {
+    Result::Err(RuntimeError::new(token.line, String::from(msg)))
 }
