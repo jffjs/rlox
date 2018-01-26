@@ -25,7 +25,7 @@ fn run_file(filename: &str) {
     match File::open(filename) {
         Ok(mut f) => match f.read_to_string(&mut source) {
             Ok(_) => match interpreter.run(source) {
-                Ok(output) => println!("{}", output),
+                Ok(_) => (),
                 Err(_) => process::exit(70)
             },
             Err(e) => {
@@ -48,7 +48,7 @@ fn run_prompt() {
         io::stdout().flush().unwrap();
         match io::stdin().read_line(&mut line) {
             Ok(_) => match interpreter.run(line) {
-                Ok(output) => println!("{}", output),
+                Ok(_) => (),
                 Err(_) => ()
             },
             Err(e) => panic!(e)

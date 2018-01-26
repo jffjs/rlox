@@ -16,7 +16,7 @@ impl Interpreter {
         Interpreter
     }
 
-    pub fn run(&mut self, source: String) -> Result<String, LoxError> {
+    pub fn run(&mut self, source: String) -> Result<(), LoxError> {
         let scanner = Scanner::new(source);
 
         match scanner.scan_tokens() {
@@ -25,14 +25,20 @@ impl Interpreter {
                 Err(LoxError)
             },
             Ok(tokens) => {
+                let mut errors: Vec<Box<Error>> = vec![];
                 match parse(&tokens) {
-                    Ok(expr) => {
-                        match expr.evaluate() {
-                            Ok(result) => Ok(result.to_string()),
-                            Err(error) => {
-                                Interpreter::report_errors(vec![Box::new(error)]);
-                                Err(LoxError)
+                    Ok(statements) => {
+                        for statement in statements {
+                            match statement.execute() {
+                                Ok(_) => (),
+                                Err(error) => errors.push(Box::new(error))
                             }
+                        }
+                        if errors.len() > 0 {
+                            Interpreter::report_errors(errors);
+                            Err(LoxError)
+                        } else {
+                            Ok(())
                         }
                     },
                     Err(error) => {
