@@ -17,7 +17,7 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Vec<ast::Stmt>, Box<Error>> {
     let mut statements: Vec<ast::Stmt> = vec![];
     let mut pos = 0;
     while tokens[pos].token_type != TokenType::Eof {
-        match statement(tokens, pos) {
+        match declaration(tokens, pos) {
             StmtResult::Ok(stmt, next_pos) => {
                 statements.push(stmt);
                 pos = next_pos;
@@ -33,7 +33,7 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Vec<ast::Stmt>, Box<Error>> {
     Ok(statements)
 }
 
-fn delcaration(tokens: &Vec<Token>, pos: usize) -> StmtResult {
+fn declaration(tokens: &Vec<Token>, pos: usize) -> StmtResult {
     if match_type(&tokens[pos], vec![TokenType::Var]) {
         var_declaration(tokens, pos + 1)
     } else {
@@ -41,7 +41,7 @@ fn delcaration(tokens: &Vec<Token>, pos: usize) -> StmtResult {
     }
 }
 
-fn var_declaration(tokens: &Vec<Token>, pos: usize) -> StmtResult {
+fn var_declaration(tokens: &Vec<Token>, mut pos: usize) -> StmtResult {
     if match_type(&tokens[pos], vec![TokenType::Identifier]) {
         let name = &tokens[pos];
         pos += 1;

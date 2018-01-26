@@ -14,6 +14,9 @@ impl<'a> ast::Stmt<'a> {
                 let expr_result = print_stmt.expression.evaluate()?;
                 println!("{}", expr_result);
                 Ok(())
+            },
+            ast::Stmt::Var(var_stmt) => {
+                Err(runtime_error(var_stmt.name, "Not supported yet.").unwrap_err())
             }
         }
     }

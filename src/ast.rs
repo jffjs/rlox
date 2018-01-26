@@ -173,8 +173,8 @@ impl<'a> PrintStmt<'a> {
 
 #[derive(Debug)]
 pub struct VarStmt<'a> {
-    name: &'a Token,
-    initializer: Option<Box<Expr<'a>>>
+    pub name: &'a Token,
+    pub initializer: Option<Box<Expr<'a>>>
 }
 
 impl<'a> VarStmt<'a> {
