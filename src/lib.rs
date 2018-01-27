@@ -3,17 +3,21 @@ mod parser;
 mod token;
 mod ast;
 mod eval;
+mod env;
 
 use std::error::Error;
 use std::fmt;
+use env::Environment;
 use parser::parse;
 use scanner::Scanner;
 
-pub struct Interpreter;
+pub struct Interpreter {
+    env: Environment
+}
 
 impl Interpreter {
     pub fn new() -> Interpreter {
-        Interpreter
+        Interpreter { env: Environment::new() }
     }
 
     pub fn run(&mut self, source: String) -> Result<(), LoxError> {
@@ -29,7 +33,7 @@ impl Interpreter {
                 match parse(&tokens) {
                     Ok(statements) => {
                         for statement in statements {
-                            match statement.execute() {
+                            match statement.execute(&mut self.env) {
                                 Ok(_) => (),
                                 Err(error) => errors.push(Box::new(error))
                             }
@@ -41,8 +45,8 @@ impl Interpreter {
                             Ok(())
                         }
                     },
-                    Err(error) => {
-                        Interpreter::report_errors(vec![error]);
+                    Err(errors) => {
+                        Interpreter::report_errors(errors);
                         Err(LoxError)
                     }
                 }

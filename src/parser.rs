@@ -13,8 +13,9 @@ enum ExprResult<'a> {
     Err(&'a str, usize)
 }
 
-pub fn parse(tokens: &Vec<Token>) -> Result<Vec<ast::Stmt>, Box<Error>> {
+pub fn parse(tokens: &Vec<Token>) -> Result<Vec<ast::Stmt>, Vec<Box<Error>>> {
     let mut statements: Vec<ast::Stmt> = vec![];
+    let mut errors: Vec<Box<Error>> = vec![];
     let mut pos = 0;
     while tokens[pos].token_type != TokenType::Eof {
         match declaration(tokens, pos) {
@@ -22,11 +23,35 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Vec<ast::Stmt>, Box<Error>> {
                 statements.push(stmt);
                 pos = next_pos;
             },
-            StmtResult::Err(msg, pos) => {
-                // add sync logic
-                let token = &tokens[pos];
+            StmtResult::Err(msg, mut next_pos) => {
+                let token = &tokens[next_pos];
                 let error = ParseError::new(token.line, token.lexeme.clone(), String::from(msg));
-                return Err(Box::new(error));
+                println!("{}", error);
+                errors.push(Box::new(error));
+
+                // fast forward to next statement
+                if tokens[next_pos].token_type != TokenType::Eof {
+                    next_pos += 1;
+                }
+                let mut next_tok = &tokens[next_pos];
+                while next_tok.token_type != TokenType::Eof {
+                    let prev_tok = &tokens[next_pos -1];
+                    if prev_tok.token_type == TokenType::Semicolon {
+                        break;
+                    }
+
+                    match next_tok.token_type {
+                        TokenType::Class | TokenType::Fun | TokenType::Var | TokenType::For |
+                        TokenType::If | TokenType::While | TokenType::Print | TokenType::Return => {
+                            break;
+                        },
+                        _ => {
+                            next_pos += 1;
+                            next_tok = &tokens[next_pos];
+                        }
+                    }
+                }
+                pos = next_pos;
             }
         }
     }

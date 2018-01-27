@@ -1,22 +1,29 @@
 use std::error::Error;
 use std::fmt;
 use ast;
+use env::Environment;
 use token;
 
 impl<'a> ast::Stmt<'a> {
-    pub fn execute(self) -> Result<(), RuntimeError> {
+    pub fn execute(self, env: &mut Environment) -> Result<(), RuntimeError> {
         match self {
             ast::Stmt::Expr(expr_stmt) => {
-                expr_stmt.expression.evaluate()?;
+                expr_stmt.expression.evaluate(env)?;
                 Ok(())
             },
             ast::Stmt::Print(print_stmt) => {
-                let expr_result = print_stmt.expression.evaluate()?;
+                let expr_result = print_stmt.expression.evaluate(env)?;
                 println!("{}", expr_result);
                 Ok(())
             },
             ast::Stmt::Var(var_stmt) => {
-                Err(runtime_error(var_stmt.name, "Not supported yet.").unwrap_err())
+                let value;
+                match var_stmt.initializer {
+                    Some(initializer) => value = initializer.evaluate(env)?,
+                    None => value = EvalResult::Nil
+                }
+                env.define(var_stmt.name.lexeme.clone(), value);
+                Ok(())
             }
         }
     }
@@ -41,8 +48,19 @@ impl fmt::Display for EvalResult {
     }
 }
 
+impl EvalResult {
+    fn clone(&self) -> EvalResult {
+        match self {
+            &EvalResult::Nil => EvalResult::Nil,
+            &EvalResult::Boolean(b) => EvalResult::Boolean(b),
+            &EvalResult::Number(n) => EvalResult::Number(n),
+            &EvalResult::String(ref s) => EvalResult::String(s.clone())
+        }
+    }
+}
+
 impl<'a> ast::Expr<'a> {
-    pub fn evaluate(self) -> Result<EvalResult, RuntimeError> {
+    pub fn evaluate(self, env: &Environment) -> Result<EvalResult, RuntimeError> {
         match self {
             ast::Expr::Literal(lit_expr) => match lit_expr.value {
                 token::Literal::Nil => Ok(EvalResult::Nil),
@@ -51,9 +69,9 @@ impl<'a> ast::Expr<'a> {
                 token::Literal::Number(n) => Ok(EvalResult::Number(n)),
                 token::Literal::String(s) => Ok(EvalResult::String(s.clone()))
             },
-            ast::Expr::Grouping(group_expr) => group_expr.expression.evaluate(),
+            ast::Expr::Grouping(group_expr) => group_expr.expression.evaluate(env),
             ast::Expr::Unary(unary_expr) => {
-                let right = unary_expr.right.evaluate()?;
+                let right = unary_expr.right.evaluate(env)?;
                 let operator = unary_expr.operator;
                 match operator.token_type {
                     token::TokenType::Minus => match right {
@@ -65,12 +83,19 @@ impl<'a> ast::Expr<'a> {
                 }
             },
             ast::Expr::Binary(bin_expr) => {
-                let left = bin_expr.left.evaluate();
-                let right = bin_expr.right.evaluate();
+                let left = bin_expr.left.evaluate(env);
+                let right = bin_expr.right.evaluate(env);
                 let operator = bin_expr.operator;
                 eval_binary_expr(&operator, left?, right?)
             },
-            _ => panic!("I don't know how to evaluate this yet.")
+            ast::Expr::Variable(var_expr) => {
+                let name = &var_expr.name;
+                match env.get(&name.lexeme) {
+                    Some(val) => Ok(val.clone()),
+                    None => runtime_error(name, &format!("Undefined variable '{}'", name.lexeme))
+                }
+            },
+            // _ => panic!("I don't know how to evaluate this yet.")
         }
     }
 }
