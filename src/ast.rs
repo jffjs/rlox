@@ -3,6 +3,7 @@ use token::{Literal, Token};
 
 #[derive(Debug)]
 pub enum Expr<'a> {
+    Assign(AssignExpr<'a>),
     Binary(BinaryExpr<'a>),
     Grouping(GroupingExpr<'a>),
     Literal(LiteralExpr),
@@ -13,6 +14,9 @@ pub enum Expr<'a> {
 impl<'a> fmt::Display for Expr<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            &Expr::Assign(ref assign_expr) => {
+                write!(f, "(= {} {})", assign_expr.name.lexeme, assign_expr.value)
+            },
             &Expr::Binary(ref bin_expr) => {
                 write!(f, "{}", parenthesize(&bin_expr.operator.lexeme, vec![&bin_expr.left, &bin_expr.right]))
             },
@@ -45,6 +49,10 @@ fn parenthesize(name: &str, exprs: Vec<&Box<Expr>>) -> String {
 
 
 impl<'a> Expr<'a> {
+    pub fn assign(name: &'a Token, value: Expr<'a>) -> Expr<'a> {
+        Expr::Assign(AssignExpr::new(name, value))
+    }
+
     pub fn binary(left: Expr<'a>, operator: &'a Token, right: Expr<'a>) -> Expr<'a> {
         Expr::Binary(BinaryExpr::new(left, operator, right))
     }
@@ -63,6 +71,18 @@ impl<'a> Expr<'a> {
 
     pub fn variable(name: &'a Token) -> Expr<'a> {
         Expr::Variable(VariableExpr::new(name))
+    }
+}
+
+#[derive(Debug)]
+pub struct AssignExpr<'a> {
+    pub name: &'a Token,
+    pub value: Box<Expr<'a>>
+}
+
+impl<'a> AssignExpr<'a> {
+    pub fn new(name: &'a Token, value: Expr<'a>) -> AssignExpr<'a> {
+        AssignExpr { name, value: Box::new(value) }
     }
 }
 
