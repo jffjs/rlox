@@ -29,7 +29,7 @@ impl<'a> ast::Stmt<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum EvalResult {
     Nil,
     Boolean(bool),

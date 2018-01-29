@@ -11,13 +11,13 @@ use env::Environment;
 use parser::parse;
 use scanner::Scanner;
 
-pub struct Interpreter {
-    env: Environment
+pub struct Interpreter<'a> {
+    env: Environment<'a>
 }
 
-impl Interpreter {
-    pub fn new() -> Interpreter {
-        Interpreter { env: Environment::new() }
+impl<'a> Interpreter<'a> {
+    pub fn new() -> Interpreter<'a> {
+        Interpreter { env: Environment::root() }
     }
 
     pub fn run(&mut self, source: String) -> Result<(), LoxError> {
