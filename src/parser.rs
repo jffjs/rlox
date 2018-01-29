@@ -134,7 +134,31 @@ fn expression_statement(tokens: &Vec<Token>, pos: usize) -> StmtResult {
 }
 
 fn expression(tokens: &Vec<Token>, pos: usize) -> ExprResult {
-    equality(tokens, pos)
+    assignment(tokens, pos)
+}
+
+fn assignment(tokens: &Vec<Token>, pos: usize) -> ExprResult {
+    match equality(tokens, pos) {
+        ExprResult::Ok(expr, pos) => {
+            if match_type(&tokens[pos], vec![TokenType::Equal]) {
+                let value = assignment(tokens, pos + 1);
+
+                match expr {
+                    ast::Expr::Variable(var_expr) => {
+                        let name = var_expr.name;
+                        match value {
+                            ExprResult::Ok(val_expr, pos) => ExprResult::Ok(ast::Expr::assign(name, val_expr), pos),
+                            ExprResult::Err(msg, pos) => ExprResult::Err(msg, pos)
+                        }
+                    },
+                    _ => ExprResult::Err("Invalid assignment target.", pos)
+                }
+            } else {
+                ExprResult::Ok(expr, pos)
+            }
+        },
+        ExprResult::Err(err, pos) => ExprResult::Err(err, pos)
+    }
 }
 
 fn equality(tokens: &Vec<Token>, pos: usize) -> ExprResult {

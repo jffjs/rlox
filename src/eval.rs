@@ -60,7 +60,7 @@ impl EvalResult {
 }
 
 impl<'a> ast::Expr<'a> {
-    pub fn evaluate(self, env: &Environment) -> Result<EvalResult, RuntimeError> {
+    pub fn evaluate(self, env: &mut Environment) -> Result<EvalResult, RuntimeError> {
         match self {
             ast::Expr::Literal(lit_expr) => match lit_expr.value {
                 token::Literal::Nil => Ok(EvalResult::Nil),
@@ -95,6 +95,14 @@ impl<'a> ast::Expr<'a> {
                     None => runtime_error(name, &format!("Undefined variable '{}'", name.lexeme))
                 }
             },
+            ast::Expr::Assign(assign_expr) => {
+                let name = assign_expr.name;
+                let value = assign_expr.value.evaluate(env)?;
+                match env.assign(name.lexeme.clone(), value.clone()) {
+                    Ok(_) => Ok(value),
+                    Err(msg) => runtime_error(name, &msg)
+                }
+            }
             // _ => panic!("I don't know how to evaluate this yet.")
         }
     }
