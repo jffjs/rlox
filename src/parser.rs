@@ -96,10 +96,10 @@ fn var_declaration(tokens: &Vec<Token>, mut pos: usize) -> StmtResult {
 }
 
 fn statement(tokens: &Vec<Token>, pos: usize) -> StmtResult {
-    if match_type(&tokens[pos], vec![TokenType::Print]) {
-        print_statement(tokens, pos + 1)
-    } else {
-        expression_statement(tokens, pos)
+    match tokens[pos].token_type {
+        TokenType::Print => print_statement(tokens, pos + 1),
+        TokenType::LeftBrace => block_statement(tokens, pos +1),
+        _ => expression_statement(tokens, pos)
     }
 }
 
@@ -115,6 +115,28 @@ fn print_statement(tokens: &Vec<Token>, pos: usize) -> StmtResult {
             }
         },
         ExprResult::Err(err, pos) => StmtResult::Err(err, pos)
+    }
+}
+
+fn block_statement(tokens: &Vec<Token>, mut pos: usize) -> StmtResult {
+    let mut statements: Vec<ast::Stmt> = vec![];
+
+    let mut next_tok = &tokens[pos];
+    while !match_type(next_tok, vec![TokenType::RightBrace]) && next_tok.token_type != TokenType::Eof {
+        match declaration(tokens, pos + 1) {
+            StmtResult::Ok(statement, next_pos) =>{
+                statements.push(statement);
+                pos = next_pos;
+            },
+            StmtResult::Err(msg, next_pos) => return StmtResult::Err(msg, next_pos)
+        }
+        next_tok = &tokens[pos];
+    }
+
+    // consume right brace
+    match next_tok.token_type {
+        TokenType::RightBrace => StmtResult::Ok(ast::Stmt::block(statements), pos + 1),
+        _ => StmtResult::Err("Expect '}' after block.", pos)
     }
 }
 

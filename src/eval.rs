@@ -24,6 +24,16 @@ impl<'a> ast::Stmt<'a> {
                 }
                 env.define(var_stmt.name.lexeme.clone(), value);
                 Ok(())
+            },
+            ast::Stmt::Block(block_stmt) => {
+                // let mut child_env = env.new_child();
+                // for statement in block_stmt.statements {
+                //     match statement.execute(&mut child_env) {
+                //         Ok(_) => (),
+                //         Err(err) => return Err(err)
+                //     }
+                // }
+                Ok(())
             }
         }
     }
