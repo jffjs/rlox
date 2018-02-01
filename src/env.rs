@@ -84,6 +84,11 @@ mod env_tests {
         assert_eq!(EvalResult::Number(4.0), *child.get(&key).unwrap());
     }
 
+    // fn test(env: &Environment) {
+    //     let child = env.new_child();
+    //     assert_eq!(EvalResult::Number(4.0), *env.get(&String::from("foo")).unwrap());
+    // }
+
     #[test]
     fn assign_to_parent() {
         let mut root = Environment::root();
