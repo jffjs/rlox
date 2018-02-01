@@ -1,43 +1,66 @@
 use std::collections::HashMap;
 use eval::EvalResult;
 
-pub struct Environment<'a> {
-    values: HashMap<String, EvalResult>,
-    enclosing: Option<Box<&'a mut Environment<'a>>>
+pub struct Environment {
+    scopes: Vec<HashMap<String, EvalResult>>,
+    current_scope: usize
 }
 
-impl<'a> Environment<'a> {
-    pub fn root() -> Environment<'a> {
-        Environment { values: HashMap::new(), enclosing: None }
+impl Environment {
+    pub fn new() -> Environment {
+        Environment { scopes: vec![HashMap::new()], current_scope: 0 }
     }
 
-    pub fn new_child(&'a mut self) -> Environment<'a> {
-        Environment { values: HashMap::new(), enclosing: Some(Box::new(self)) }
+    pub fn push_scope(&mut self) {
+        self.current_scope += 1;
+        self.scopes.push(HashMap::new());
+    }
+
+    pub fn pop_scope(&mut self) {
+        match self.scopes.pop() {
+            Some(_) => self.current_scope -= 1,
+            None => ()
+        }
     }
 
     pub fn assign(&mut self, name: String, val: EvalResult) -> Result<(), String> {
-        match self.enclosing {
-            Some(ref mut env) => env.assign(name, val),
-            None => {
-                if self.values.contains_key(&name) {
-                    self.values.insert(name, val);
-                    Ok(())
-                } else {
-                    Err(format!("Undefined variable '{}'.", name))
-                }
+        let mut scope = self.current_scope;
+
+        while scope != 0 {
+            if self.scopes[scope].contains_key(&name) {
+                self.scopes[scope].insert(name, val);
+                return Ok(());
+            } else {
+                scope -= 1;
             }
+        }
+
+        // scope is 0
+        if self.scopes[scope].contains_key(&name) {
+            self.scopes[scope].insert(name, val);
+            Ok(())
+        } else {
+            Err(format!("Undefined variable '{}'.", name))
         }
     }
 
     pub fn define(&mut self, name: String, val: EvalResult) {
-        self.values.insert(name, val);
+        self.scopes[self.current_scope].insert(name, val);
     }
 
     pub fn get(&self, name: &String) -> Option<&EvalResult> {
-        match self.enclosing {
-            Some(ref env) => env.get(name),
-            None => self.values.get(name)
+        let mut scope = self.current_scope;
+        while scope != 0 {
+            match self.get_in_scope(name, self.current_scope) {
+                Some(val) => return Some(val),
+                None => scope -= 1
+            }
         }
+        self.get_in_scope(name, scope)
+    }
+
+    fn get_in_scope(&self, name: &String, scope: usize) -> Option<&EvalResult> {
+        self.scopes[scope].get(name)
     }
 }
 
@@ -48,7 +71,7 @@ mod env_tests {
 
     #[test]
     fn define_and_get() {
-        let mut env = Environment::root();
+        let mut env = Environment::new();
         let key = String::from("foo");
         env.define(key.clone(), EvalResult::Number(4.0));
 
@@ -57,7 +80,7 @@ mod env_tests {
 
     #[test]
     fn assign_success() {
-        let mut env = Environment::root();
+        let mut env = Environment::new();
         let key = String::from("foo");
         env.define(key.clone(), EvalResult::Number(4.0));
         let _result = env.assign(key.clone(), EvalResult::Boolean(true));
@@ -67,7 +90,7 @@ mod env_tests {
 
     #[test]
     fn assign_fail() {
-        let mut env = Environment::root();
+        let mut env = Environment::new();
         let key = String::from("foo");
         let err = env.assign(key.clone(), EvalResult::Boolean(true)).unwrap_err();
 
@@ -75,29 +98,42 @@ mod env_tests {
     }
 
     #[test]
-    fn get_from_parent() {
-        let mut root = Environment::root();
+    fn get_from_parent_scope() {
+        let mut env = Environment::new();
         let key = String::from("foo");
-        root.define(key.clone(), EvalResult::Number(4.0));
-        let child = root.new_child();
+        env.define(key.clone(), EvalResult::Number(4.0));
+        env.push_scope();
 
-        assert_eq!(EvalResult::Number(4.0), *child.get(&key).unwrap());
+        assert_eq!(EvalResult::Number(4.0), *env.get(&key).unwrap());
     }
 
-    // fn test(env: &Environment) {
-    //     let child = env.new_child();
-    //     assert_eq!(EvalResult::Number(4.0), *env.get(&String::from("foo")).unwrap());
-    // }
 
     #[test]
     fn assign_to_parent() {
-        let mut root = Environment::root();
+        let mut env = Environment::new();
         let key = String::from("foo");
-        root.define(key.clone(), EvalResult::Number(4.0));
-        assert_eq!(EvalResult::Number(4.0), *root.get(&key).unwrap());
+        env.define(key.clone(), EvalResult::Number(4.0));
+        assert_eq!(EvalResult::Number(4.0), *env.get(&key).unwrap());
 
-        let mut child = root.new_child();
-        let _result = child.assign(key.clone(), EvalResult::Number(5.0));
-        assert_eq!(EvalResult::Number(5.0), *child.get(&key).unwrap());
+        env.push_scope();
+        let _result = env.assign(key.clone(), EvalResult::Number(5.0));
+
+        assert_eq!(EvalResult::Number(5.0), *env.get(&key).unwrap());
+    }
+
+    #[test]
+    fn shadow_var() {
+        let mut env = Environment::new();
+        let key = String::from("foo");
+        env.define(key.clone(), EvalResult::Number(4.0));
+        assert_eq!(EvalResult::Number(4.0), *env.get(&key).unwrap());
+
+        env.push_scope();
+        env.define(key.clone(), EvalResult::Number(5.0));
+
+        assert_eq!(EvalResult::Number(5.0), *env.get(&key).unwrap());
+
+        env.pop_scope();
+        assert_eq!(EvalResult::Number(4.0), *env.get(&key).unwrap());
     }
 }

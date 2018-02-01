@@ -26,13 +26,14 @@ impl<'a> ast::Stmt<'a> {
                 Ok(())
             },
             ast::Stmt::Block(block_stmt) => {
-                // let mut child_env = env.new_child();
-                // for statement in block_stmt.statements {
-                //     match statement.execute(&mut child_env) {
-                //         Ok(_) => (),
-                //         Err(err) => return Err(err)
-                //     }
-                // }
+                env.push_scope();
+                for statement in block_stmt.statements {
+                    match statement.execute(env) {
+                        Ok(_) => (),
+                        Err(err) => return Err(err)
+                    }
+                }
+                env.pop_scope();
                 Ok(())
             }
         }
