@@ -13,7 +13,7 @@ impl<'a> ast::Stmt<'a> {
             },
             ast::Stmt::Print(print_stmt) => {
                 let expr_result = print_stmt.expression.evaluate(env)?;
-                println!("{}", expr_result);
+                println!("{}", expr_result.print());
                 Ok(())
             },
             ast::Stmt::Var(var_stmt) => {
@@ -66,6 +66,15 @@ impl EvalResult {
             &EvalResult::Boolean(b) => EvalResult::Boolean(b),
             &EvalResult::Number(n) => EvalResult::Number(n),
             &EvalResult::String(ref s) => EvalResult::String(s.clone())
+        }
+    }
+
+    pub fn print(&self) -> String {
+        match self {
+            &EvalResult::Nil => format!("nil"),
+            &EvalResult::Boolean(b) => format!("{}", b),
+            &EvalResult::Number(n) => format!("{}", n),
+            &EvalResult::String(ref s) => format!("{}", s)
         }
     }
 }
