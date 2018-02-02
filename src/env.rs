@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use eval::EvalResult;
 
+#[derive(Debug)]
 pub struct Environment {
     scopes: Vec<HashMap<String, EvalResult>>,
     current_scope: usize
@@ -51,7 +52,7 @@ impl Environment {
     pub fn get(&self, name: &String) -> Option<&EvalResult> {
         let mut scope = self.current_scope;
         while scope != 0 {
-            match self.get_in_scope(name, self.current_scope) {
+            match self.get_in_scope(name, scope) {
                 Some(val) => return Some(val),
                 None => scope -= 1
             }
@@ -104,7 +105,10 @@ mod env_tests {
         env.define(key.clone(), EvalResult::Number(4.0));
         env.push_scope();
 
-        assert_eq!(EvalResult::Number(4.0), *env.get(&key).unwrap());
+        env.define(key.clone(), EvalResult::Number(5.0));
+        env.push_scope();
+
+        assert_eq!(EvalResult::Number(5.0), *env.get(&key).unwrap());
     }
 
 
@@ -115,6 +119,7 @@ mod env_tests {
         env.define(key.clone(), EvalResult::Number(4.0));
         assert_eq!(EvalResult::Number(4.0), *env.get(&key).unwrap());
 
+        env.push_scope();
         env.push_scope();
         let _result = env.assign(key.clone(), EvalResult::Number(5.0));
 

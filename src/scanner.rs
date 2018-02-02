@@ -265,7 +265,7 @@ impl Scanner {
     }
 
     fn is_at_end(&self) -> bool {
-        self.current >= self.source_len - 1
+        self.current >= self.source_len
     }
 
     fn char_at(&self, index: usize) -> char {

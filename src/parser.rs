@@ -26,7 +26,6 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Vec<ast::Stmt>, Vec<Box<Error>>> {
             StmtResult::Err(msg, mut next_pos) => {
                 let token = &tokens[next_pos];
                 let error = ParseError::new(token.line, token.lexeme.clone(), String::from(msg));
-                println!("{}", error);
                 errors.push(Box::new(error));
 
                 // fast forward to next statement
@@ -55,7 +54,12 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Vec<ast::Stmt>, Vec<Box<Error>>> {
             }
         }
     }
-    Ok(statements)
+
+    if errors.len() > 0 {
+        Err(errors)
+    } else {
+        Ok(statements)
+    }
 }
 
 fn declaration(tokens: &Vec<Token>, pos: usize) -> StmtResult {
@@ -123,7 +127,7 @@ fn block_statement(tokens: &Vec<Token>, mut pos: usize) -> StmtResult {
 
     let mut next_tok = &tokens[pos];
     while !match_type(next_tok, vec![TokenType::RightBrace]) && next_tok.token_type != TokenType::Eof {
-        match declaration(tokens, pos + 1) {
+        match declaration(tokens, pos) {
             StmtResult::Ok(statement, next_pos) =>{
                 statements.push(statement);
                 pos = next_pos;
