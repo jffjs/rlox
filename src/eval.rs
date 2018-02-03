@@ -7,8 +7,31 @@ use token;
 impl<'a> ast::Stmt<'a> {
     pub fn execute(self, env: &mut Environment) -> Result<(), RuntimeError> {
         match self {
+            ast::Stmt::Block(block_stmt) => {
+                env.push_scope();
+                for statement in block_stmt.statements {
+                    match statement.execute(env) {
+                        Ok(_) => (),
+                        Err(err) => return Err(err)
+                    }
+                }
+                env.pop_scope();
+                Ok(())
+            },
             ast::Stmt::Expr(expr_stmt) => {
                 expr_stmt.expression.evaluate(env)?;
+                Ok(())
+            },
+            ast::Stmt::If(if_stmt) => {
+                let condition = if_stmt.condition.evaluate(env)?;
+                if is_truthy(&condition) {
+                    if_stmt.then_branch.execute(env)?;
+                } else {
+                    match if_stmt.else_branch {
+                        Some(else_branch) => else_branch.execute(env)?,
+                        None => ()
+                    }
+                }
                 Ok(())
             },
             ast::Stmt::Print(print_stmt) => {
@@ -23,17 +46,6 @@ impl<'a> ast::Stmt<'a> {
                     None => value = EvalResult::Nil
                 }
                 env.define(var_stmt.name.lexeme.clone(), value);
-                Ok(())
-            },
-            ast::Stmt::Block(block_stmt) => {
-                env.push_scope();
-                for statement in block_stmt.statements {
-                    match statement.execute(env) {
-                        Ok(_) => (),
-                        Err(err) => return Err(err)
-                    }
-                }
-                env.pop_scope();
                 Ok(())
             }
         }
@@ -98,7 +110,7 @@ impl<'a> ast::Expr<'a> {
                         EvalResult::Number(n) => Ok(EvalResult::Number(-n)),
                         _ => runtime_error(&operator, "Operand must be a number.")
                     },
-                    token::TokenType::Bang => Ok(EvalResult::Boolean(!is_truthy(right))),
+                    token::TokenType::Bang => Ok(EvalResult::Boolean(!is_truthy(&right))),
                     _ => panic!("Invalid unary expression. Check parser.")
                 }
             },
@@ -122,16 +134,36 @@ impl<'a> ast::Expr<'a> {
                     Ok(_) => Ok(value),
                     Err(msg) => runtime_error(name, &msg)
                 }
+            },
+            ast::Expr::Logical(logical_expr) => {
+                let left = logical_expr.left.evaluate(env)?;
+                match logical_expr.operator.token_type {
+                    token::TokenType::Or => {
+                        if is_truthy(&left) {
+                            Ok(left)
+                        } else {
+                            logical_expr.right.evaluate(env)
+                        }
+                    },
+                    token::TokenType::And => {
+                        if !is_truthy(&left) {
+                            Ok(left)
+                        } else {
+                            logical_expr.right.evaluate(env)
+                        }
+                    },
+                    _ => panic!("Invalid logical epxression. Check parser.")
+                }
             }
             // _ => panic!("I don't know how to evaluate this yet.")
         }
     }
 }
 
-fn is_truthy(val: EvalResult) -> bool {
+fn is_truthy(val: &EvalResult) -> bool {
     match val {
-        EvalResult::Nil => false,
-        EvalResult::Boolean(b) => b,
+        &EvalResult::Nil => false,
+        &EvalResult::Boolean(b) => b,
         _ => true
     }
 }

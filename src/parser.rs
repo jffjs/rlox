@@ -101,9 +101,33 @@ fn var_declaration(tokens: &Vec<Token>, mut pos: usize) -> StmtResult {
 
 fn statement(tokens: &Vec<Token>, pos: usize) -> StmtResult {
     match tokens[pos].token_type {
-        TokenType::Print => print_statement(tokens, pos + 1),
+        TokenType::If => if_statement(tokens, pos + 1),
         TokenType::LeftBrace => block_statement(tokens, pos +1),
+        TokenType::Print => print_statement(tokens, pos + 1),
         _ => expression_statement(tokens, pos)
+    }
+}
+
+fn if_statement(tokens: &Vec<Token>, pos: usize) -> StmtResult {
+    match tokens[pos].token_type {
+        TokenType::LeftParen => match expression(tokens, pos + 1) {
+            ExprResult::Ok(condition, pos) => match tokens[pos].token_type {
+                TokenType::RightParen => match statement(tokens, pos + 1) {
+                    StmtResult::Ok(then_branch, pos) => match tokens[pos].token_type {
+                        TokenType::Else => match statement(tokens, pos + 1) {
+                            StmtResult::Ok(else_branch, pos) =>
+                                StmtResult::Ok(ast::Stmt::if_then_else(condition, then_branch, else_branch), pos),
+                            StmtResult::Err(msg, pos) => StmtResult::Err(msg, pos)
+                        },
+                        _ => StmtResult::Ok(ast::Stmt::if_then(condition, then_branch), pos)
+                    },
+                    StmtResult::Err(msg, pos) => StmtResult::Err(msg, pos)
+                },
+                _ => StmtResult::Err("Expect ')' after if condition.", pos)
+            },
+            ExprResult::Err(msg, pos) => StmtResult::Err(msg, pos)
+        },
+        _ => StmtResult::Err("Expect '(' after 'if'.", pos)
     }
 }
 
@@ -164,7 +188,7 @@ fn expression(tokens: &Vec<Token>, pos: usize) -> ExprResult {
 }
 
 fn assignment(tokens: &Vec<Token>, pos: usize) -> ExprResult {
-    match equality(tokens, pos) {
+    match or(tokens, pos) {
         ExprResult::Ok(expr, pos) => {
             if match_type(&tokens[pos], vec![TokenType::Equal]) {
                 let value = assignment(tokens, pos + 1);
@@ -182,6 +206,48 @@ fn assignment(tokens: &Vec<Token>, pos: usize) -> ExprResult {
             } else {
                 ExprResult::Ok(expr, pos)
             }
+        },
+        ExprResult::Err(err, pos) => ExprResult::Err(err, pos)
+    }
+}
+
+fn or(tokens: &Vec<Token>, pos: usize) -> ExprResult {
+    match and(tokens, pos) {
+        ExprResult::Ok(mut expr, mut pos) => {
+            let mut next_tok = &tokens[pos];
+            while match_type(next_tok, vec![TokenType::Or]) {
+                let operator = &tokens[pos];
+                match and(tokens, pos + 1) {
+                    ExprResult::Ok(right, next_pos) => {
+                        pos = next_pos;
+                        expr = ast::Expr::logical(expr, operator, right);
+                    },
+                    ExprResult::Err(msg, pos) => return ExprResult::Err(msg, pos)
+                }
+                next_tok = &tokens[pos];
+            }
+            ExprResult::Ok(expr, pos)
+        },
+        ExprResult::Err(err, pos) => ExprResult::Err(err, pos)
+    }
+}
+
+fn and(tokens: &Vec<Token>, pos: usize) -> ExprResult {
+    match equality(tokens, pos) {
+        ExprResult::Ok(mut expr, mut pos) => {
+            let mut next_tok = &tokens[pos];
+            while match_type(next_tok, vec![TokenType::And]) {
+                let operator = &tokens[pos];
+                match equality(tokens, pos + 1) {
+                    ExprResult::Ok(right, next_pos) => {
+                        pos = next_pos;
+                        expr = ast::Expr::logical(expr, operator, right);
+                    },
+                    ExprResult::Err(msg, pos) => return ExprResult::Err(msg, pos)
+                }
+                next_tok = &tokens[pos];
+            }
+            ExprResult::Ok(expr, pos)
         },
         ExprResult::Err(err, pos) => ExprResult::Err(err, pos)
     }

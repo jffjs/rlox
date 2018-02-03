@@ -5,6 +5,7 @@ use token::{Literal, Token};
 pub enum Stmt<'a> {
     Block(BlockStmt<'a>),
     Expr(ExprStmt<'a>),
+    If(IfStmt<'a>),
     Print(PrintStmt<'a>),
     Var(VarStmt<'a>)
 }
@@ -16,6 +17,14 @@ impl<'a> Stmt<'a> {
 
     pub fn expr(expression: Expr<'a>) -> Stmt<'a> {
         Stmt::Expr(ExprStmt::new(expression))
+    }
+
+    pub fn if_then(condition: Expr<'a>, then_branch: Stmt<'a>) -> Stmt<'a> {
+        Stmt::If(IfStmt::new(condition, then_branch, None))
+    }
+
+    pub fn if_then_else(condition: Expr<'a>, then_branch: Stmt<'a>, else_branch: Stmt<'a>) -> Stmt<'a> {
+        Stmt::If(IfStmt::new(condition, then_branch, Some(Box::new(else_branch))))
     }
 
     pub fn print(expression: Expr<'a>) -> Stmt<'a> {
@@ -54,6 +63,19 @@ impl<'a> ExprStmt<'a> {
 }
 
 #[derive(Debug)]
+pub struct IfStmt<'a> {
+    pub condition: Expr<'a>,
+    pub then_branch: Box<Stmt<'a>>,
+    pub else_branch: Option<Box<Stmt<'a>>>
+}
+
+impl<'a> IfStmt<'a> {
+    fn new(condition: Expr<'a>, then_branch: Stmt<'a>, else_branch: Option<Box<Stmt<'a>>>) -> IfStmt<'a> {
+        IfStmt { condition, then_branch: Box::new(then_branch), else_branch }
+    }
+}
+
+#[derive(Debug)]
 pub struct PrintStmt<'a> {
     pub expression: Box<Expr<'a>>
 }
@@ -82,6 +104,7 @@ pub enum Expr<'a> {
     Binary(BinaryExpr<'a>),
     Grouping(GroupingExpr<'a>),
     Literal(LiteralExpr),
+    Logical(LogicalExpr<'a>),
     Unary(UnaryExpr<'a>),
     Variable(VariableExpr<'a>)
 }
@@ -100,6 +123,9 @@ impl<'a> fmt::Display for Expr<'a> {
             },
             &Expr::Literal(ref lit_expr) => {
                 write!(f, "{}", &lit_expr.value.to_string())
+            },
+            &Expr::Logical(ref log_expr) => {
+                write!(f, "{}", parenthesize(&log_expr.operator.lexeme, vec![&log_expr.left, &log_expr.right]))
             },
             &Expr::Unary(ref unary_expr) => {
                 write!(f, "{}", parenthesize(&unary_expr.operator.lexeme, vec![&unary_expr.right]))
@@ -138,6 +164,10 @@ impl<'a> Expr<'a> {
 
     pub fn literal(lit: Literal) -> Expr<'a> {
         Expr::Literal(LiteralExpr::new(lit))
+    }
+
+    pub fn logical(left: Expr<'a>, operator: &'a Token, right: Expr<'a>) -> Expr<'a> {
+        Expr::Logical(LogicalExpr::new(left, operator, right))
     }
 
     pub fn grouping(expr: Expr) -> Expr {
@@ -193,6 +223,19 @@ pub struct LiteralExpr {
 impl LiteralExpr {
     fn new(value: Literal) -> LiteralExpr {
         LiteralExpr { value }
+    }
+}
+
+#[derive(Debug)]
+pub struct LogicalExpr<'a> {
+    pub left: Box<Expr<'a>>,
+    pub operator: &'a Token,
+    pub right: Box<Expr<'a>>
+}
+
+impl<'a> LogicalExpr<'a> {
+    fn new(left: Expr<'a>, operator: &'a Token, right: Expr<'a>) -> LogicalExpr<'a> {
+        LogicalExpr { left: Box::new(left), operator, right: Box::new(right) }
     }
 }
 
