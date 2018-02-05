@@ -43,7 +43,7 @@ impl<'a> ast::Stmt<'a> {
                 let value;
                 match var_stmt.initializer {
                     Some(ref initializer) => value = initializer.evaluate(env)?,
-                    None => value = EvalResult::Nil
+                    None => value = Value::Nil
                 }
                 env.define(var_stmt.name.lexeme.clone(), value);
                 Ok(())
@@ -60,47 +60,74 @@ impl<'a> ast::Stmt<'a> {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum EvalResult {
-    Nil,
-    Boolean(bool),
-    Number(f64),
-    String(String)
+trait Callable {
+    fn call(&self, args: Vec<Value>) -> Result<Value, RuntimeError>;
 }
 
-impl fmt::Display for EvalResult {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+#[derive(Debug, PartialEq)]
+pub enum Value {
+    Nil,
+    Boolean(bool),
+    Function(Function),
+    Number(f64),
+    String(String),
+}
+
+impl Callable for Value {
+    fn call(&self, args: Vec<Value>) -> Result<Value, RuntimeError> {
         match self {
-            &EvalResult::Nil => write!(f, "nil"),
-            &EvalResult::Boolean(b) => write!(f, "{}", b),
-            &EvalResult::Number(n) => write!(f, "{}", n),
-            &EvalResult::String(ref s) => write!(f, "\"{}\"", s)
+            &Value::Function(ref fun) => Ok(fun.call(args)),
+            _ => panic!("Value is not callable.") // TODO: Does this need to be a runtime error?
         }
     }
 }
 
-impl EvalResult {
-    fn clone(&self) -> EvalResult {
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            &EvalResult::Nil => EvalResult::Nil,
-            &EvalResult::Boolean(b) => EvalResult::Boolean(b),
-            &EvalResult::Number(n) => EvalResult::Number(n),
-            &EvalResult::String(ref s) => EvalResult::String(s.clone())
+            &Value::Nil => write!(f, "nil"),
+            &Value::Boolean(b) => write!(f, "{}", b),
+            &Value::Function(ref fun) => write!(f, ""), // TODO: implement
+            &Value::Number(n) => write!(f, "{}", n),
+            &Value::String(ref s) => write!(f, "\"{}\"", s)
+        }
+    }
+}
+
+impl Value {
+    fn clone(&self) -> Value {
+        match self {
+            &Value::Nil => Value::Nil,
+            &Value::Boolean(b) => Value::Boolean(b),
+            &Value::Function(ref fun) => Value::Function(Function {}), // TODO: implement
+            &Value::Number(n) => Value::Number(n),
+            &Value::String(ref s) => Value::String(s.clone())
         }
     }
 
     pub fn print(&self) -> String {
         match self {
-            &EvalResult::Nil => format!("nil"),
-            &EvalResult::Boolean(b) => format!("{}", b),
-            &EvalResult::Number(n) => format!("{}", n),
-            &EvalResult::String(ref s) => format!("{}", s)
+            &Value::Nil => format!("nil"),
+            &Value::Boolean(b) => format!("{}", b),
+            &Value::Function(ref fun) => format!("fun"), // TODO: implement
+            &Value::Number(n) => format!("{}", n),
+            &Value::String(ref s) => format!("{}", s)
         }
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct Function {
+}
+
+impl Function {
+    fn call(&self, args: Vec<Value>) -> Value{
+        Value::Nil
+    }
+}
+
 impl<'a> ast::Expr<'a> {
-    pub fn evaluate(&self, env: &mut Environment) -> Result<EvalResult, RuntimeError> {
+    pub fn evaluate(&self, env: &mut Environment) -> Result<Value, RuntimeError> {
         match self {
             &ast::Expr::Assign(ref assign_expr) => {
                 let name = assign_expr.name;
@@ -116,13 +143,22 @@ impl<'a> ast::Expr<'a> {
                 let operator = bin_expr.operator;
                 eval_binary_expr(&operator, left?, right?)
             },
+            &ast::Expr::Call(ref call_expr) => {
+                let callee = call_expr.callee.evaluate(env)?;
+                let mut arguments = vec![];
+                for arg in &call_expr.arguments {
+                    arguments.push(arg.evaluate(env)?);
+                }
+
+                callee.call(arguments)
+            },
             &ast::Expr::Grouping(ref group_expr) => group_expr.expression.evaluate(env),
             &ast::Expr::Literal(ref lit_expr) => match &lit_expr.value {
-                &token::Literal::Nil => Ok(EvalResult::Nil),
-                &token::Literal::True => Ok(EvalResult::Boolean(true)),
-                &token::Literal::False => Ok(EvalResult::Boolean(false)),
-                &token::Literal::Number(n) => Ok(EvalResult::Number(n)),
-                &token::Literal::String(ref s) => Ok(EvalResult::String(s.clone()))
+                &token::Literal::Nil => Ok(Value::Nil),
+                &token::Literal::True => Ok(Value::Boolean(true)),
+                &token::Literal::False => Ok(Value::Boolean(false)),
+                &token::Literal::Number(n) => Ok(Value::Number(n)),
+                &token::Literal::String(ref s) => Ok(Value::String(s.clone()))
             },
             &ast::Expr::Logical(ref logical_expr) => {
                 let left = logical_expr.left.evaluate(env)?;
@@ -149,10 +185,10 @@ impl<'a> ast::Expr<'a> {
                 let operator = unary_expr.operator;
                 match operator.token_type {
                     token::TokenType::Minus => match right {
-                        EvalResult::Number(n) => Ok(EvalResult::Number(-n)),
+                        Value::Number(n) => Ok(Value::Number(-n)),
                         _ => runtime_error(&operator, "Operand must be a number.")
                     },
-                    token::TokenType::Bang => Ok(EvalResult::Boolean(!is_truthy(&right))),
+                    token::TokenType::Bang => Ok(Value::Boolean(!is_truthy(&right))),
                     _ => panic!("Invalid unary expression. Check parser.")
                 }
             },
@@ -163,64 +199,68 @@ impl<'a> ast::Expr<'a> {
                     None => runtime_error(name, &format!("Undefined variable '{}'", name.lexeme))
                 }
             },
-            _ => panic!("I don't know how to evaluate this yet.")
+            // _ => panic!("I don't know how to evaluate this yet.")
         }
     }
 }
 
-fn is_truthy(val: &EvalResult) -> bool {
+fn is_truthy(val: &Value) -> bool {
     match val {
-        &EvalResult::Nil => false,
-        &EvalResult::Boolean(b) => b,
+        &Value::Nil => false,
+        &Value::Boolean(b) => b,
         _ => true
     }
 }
 
-fn is_equal(a: EvalResult, b: EvalResult) -> bool {
+fn is_equal(a: Value, b: Value) -> bool {
     match a {
-        EvalResult::Number(a_num) => match b {
-            EvalResult::Number(b_num) => a_num == b_num,
+        Value::Boolean(a_bool) => match b {
+            Value::Boolean(b_bool) => a_bool == b_bool,
             _ => false
         },
-        EvalResult::String(a_str) => match b {
-            EvalResult::String(b_str) => a_str.eq(&b_str),
+        Value::Function(a_fun) => match b {
+            Value::Function(b_fun) => &a_fun == &b_fun,
             _ => false
         },
-        EvalResult::Boolean(a_bool) => match b {
-            EvalResult::Boolean(b_bool) => a_bool == b_bool,
-            _ => false
-        },
-        EvalResult::Nil => match b {
-            EvalResult::Nil => true,
+        Value::Nil => match b {
+            Value::Nil => true,
             _ => false
         }
+        Value::Number(a_num) => match b {
+            Value::Number(b_num) => a_num == b_num,
+            _ => false
+        },
+        Value::String(a_str) => match b {
+            Value::String(b_str) => a_str.eq(&b_str),
+            _ => false
+        },
     }
 }
 
 fn eval_binary_expr<'a>(operator: &token::Token,
-                        left: EvalResult,
-                        right: EvalResult) -> Result<EvalResult, RuntimeError> {
+                        left: Value,
+                        right: Value) -> Result<Value, RuntimeError> {
     match operator.token_type {
-        token::TokenType::EqualEqual => Ok(EvalResult::Boolean(is_equal(left, right))),
-        token::TokenType::BangEqual => Ok(EvalResult::Boolean(!is_equal(left, right))),
+        token::TokenType::EqualEqual => Ok(Value::Boolean(is_equal(left, right))),
+        token::TokenType::BangEqual => Ok(Value::Boolean(!is_equal(left, right))),
         _ => match left {
-            EvalResult::Number(l_num) => match right {
-                EvalResult::Number(r_num) => match operator.token_type {
-                    token::TokenType::Plus => Ok(EvalResult::Number(l_num + r_num)),
-                    token::TokenType::Minus => Ok(EvalResult::Number(l_num - r_num)),
-                    token::TokenType::Star => Ok(EvalResult::Number(l_num * r_num)),
-                    token::TokenType::Slash => Ok(EvalResult::Number(l_num / r_num)),
-                    token::TokenType::Greater => Ok(EvalResult::Boolean(l_num > r_num)),
-                    token::TokenType::GreaterEqual => Ok(EvalResult::Boolean(l_num >= r_num)),
-                    token::TokenType::Less => Ok(EvalResult::Boolean(l_num < r_num)),
-                    token::TokenType::LessEqual => Ok(EvalResult::Boolean(l_num <= r_num)),
+            Value::Number(l_num) => match right {
+                Value::Number(r_num) => match operator.token_type {
+                    token::TokenType::Plus => Ok(Value::Number(l_num + r_num)),
+                    token::TokenType::Minus => Ok(Value::Number(l_num - r_num)),
+                    token::TokenType::Star => Ok(Value::Number(l_num * r_num)),
+                    token::TokenType::Slash => Ok(Value::Number(l_num / r_num)),
+                    token::TokenType::Greater => Ok(Value::Boolean(l_num > r_num)),
+                    token::TokenType::GreaterEqual => Ok(Value::Boolean(l_num >= r_num)),
+                    token::TokenType::Less => Ok(Value::Boolean(l_num < r_num)),
+                    token::TokenType::LessEqual => Ok(Value::Boolean(l_num <= r_num)),
                     _ => panic!("Invalid binary expression. Check parser")
                 },
                 _ => runtime_error(operator, "Right operand must be a Number.")
             },
-            EvalResult::String(l_str) => match right {
-                EvalResult::String(r_str) => match operator.token_type {
-                    token::TokenType::Plus => Ok(EvalResult::String(format!("{}{}", l_str, r_str))),
+            Value::String(l_str) => match right {
+                Value::String(r_str) => match operator.token_type {
+                    token::TokenType::Plus => Ok(Value::String(format!("{}{}", l_str, r_str))),
                     _ => panic!("Invalid binary expression. Check parser")
                 },
                 _ => runtime_error(operator, "Right operand must be a String.")
@@ -259,6 +299,6 @@ impl Error for RuntimeError {
     }
 }
 
-fn runtime_error(token: &token::Token, msg: &str) -> Result<EvalResult, RuntimeError> {
+fn runtime_error(token: &token::Token, msg: &str) -> Result<Value, RuntimeError> {
     Result::Err(RuntimeError::new(token.line, String::from(msg)))
 }

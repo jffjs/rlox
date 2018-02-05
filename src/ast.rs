@@ -136,6 +136,9 @@ impl<'a> fmt::Display for Expr<'a> {
             &Expr::Binary(ref bin_expr) => {
                 write!(f, "{}", parenthesize(&bin_expr.operator.lexeme, vec![&bin_expr.left, &bin_expr.right]))
             },
+            &Expr::Call(ref call_expr) => {
+                write!(f, "{}", parenthesize_call(&call_expr.callee.to_string(), &call_expr.arguments))
+            },
             &Expr::Grouping(ref group_expr) => {
                 write!(f, "{}", parenthesize("group", vec![&group_expr.expression]))
             },
@@ -150,16 +153,26 @@ impl<'a> fmt::Display for Expr<'a> {
             },
             &Expr::Variable(ref var_expr) => {
                 write!(f, "{}", &var_expr.name.lexeme)
-            },
-            _ => write!(f, "")
+            }
         }
     }
 }
 
-fn parenthesize(name: &str, exprs: Vec<&Box<Expr>>) -> String {
+fn parenthesize(name: &str, exprs: Vec<&Expr>) -> String {
     let mut result = String::from("(");
     result.push_str(name);
-    for expr in &exprs {
+    for expr in exprs {
+        result.push_str(" ");
+        result.push_str(&expr.to_string());
+    }
+    result.push_str(")");
+    result
+}
+
+fn parenthesize_call(callee: &str, args: &Vec<Expr>) -> String {
+    let mut result = String::from("(");
+    result.push_str(callee);
+    for expr in args {
         result.push_str(" ");
         result.push_str(&expr.to_string());
     }
