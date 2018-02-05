@@ -61,7 +61,7 @@ impl<'a> ast::Stmt<'a> {
 }
 
 trait Callable {
-    fn call(&self, args: Vec<Value>) -> Result<Value, RuntimeError>;
+    fn call(&self, env: &mut Environment, args: Vec<Value>) -> Result<Value, RuntimeError>;
 }
 
 #[derive(Debug, PartialEq)]
@@ -74,10 +74,10 @@ pub enum Value {
 }
 
 impl Callable for Value {
-    fn call(&self, args: Vec<Value>) -> Result<Value, RuntimeError> {
+    fn call(&self, env: &mut Environment, args: Vec<Value>) -> Result<Value, RuntimeError> {
         match self {
-            &Value::Function(ref fun) => Ok(fun.call(args)),
-            _ => panic!("Value is not callable.") // TODO: Does this need to be a runtime error?
+            &Value::Function(ref fun) => Ok(fun.call(env, args)),
+            _ => panic!("Value is not callable. This is an uncaught parse error.")
         }
     }
 }
@@ -121,7 +121,7 @@ pub struct Function {
 }
 
 impl Function {
-    fn call(&self, args: Vec<Value>) -> Value{
+    fn call(&self, env: &mut Environment, args: Vec<Value>) -> Value{
         Value::Nil
     }
 }
@@ -150,7 +150,10 @@ impl<'a> ast::Expr<'a> {
                     arguments.push(arg.evaluate(env)?);
                 }
 
-                callee.call(arguments)
+                match callee {
+                    Value::Function(_) => callee.call(env, arguments),
+                    _ => runtime_error(&call_expr.paren, "Can only call functions and classes.")
+                }
             },
             &ast::Expr::Grouping(ref group_expr) => group_expr.expression.evaluate(env),
             &ast::Expr::Literal(ref lit_expr) => match &lit_expr.value {
@@ -177,7 +180,7 @@ impl<'a> ast::Expr<'a> {
                             logical_expr.right.evaluate(env)
                         }
                     },
-                    _ => panic!("Invalid logical epxression. Check parser.")
+                    _ => panic!("Invalid logical epxression. This is an uncaught parse error.")
                 }
             }
             &ast::Expr::Unary(ref unary_expr) => {
@@ -189,7 +192,7 @@ impl<'a> ast::Expr<'a> {
                         _ => runtime_error(&operator, "Operand must be a number.")
                     },
                     token::TokenType::Bang => Ok(Value::Boolean(!is_truthy(&right))),
-                    _ => panic!("Invalid unary expression. Check parser.")
+                    _ => panic!("Invalid unary expression. This is an uncaught parse error.")
                 }
             },
             &ast::Expr::Variable(ref var_expr) => {
@@ -254,14 +257,14 @@ fn eval_binary_expr<'a>(operator: &token::Token,
                     token::TokenType::GreaterEqual => Ok(Value::Boolean(l_num >= r_num)),
                     token::TokenType::Less => Ok(Value::Boolean(l_num < r_num)),
                     token::TokenType::LessEqual => Ok(Value::Boolean(l_num <= r_num)),
-                    _ => panic!("Invalid binary expression. Check parser")
+                    _ => panic!("Invalid binary expression. This is an uncaught parse error")
                 },
                 _ => runtime_error(operator, "Right operand must be a Number.")
             },
             Value::String(l_str) => match right {
                 Value::String(r_str) => match operator.token_type {
                     token::TokenType::Plus => Ok(Value::String(format!("{}{}", l_str, r_str))),
-                    _ => panic!("Invalid binary expression. Check parser")
+                    _ => panic!("Invalid binary expression. This is an uncaught parse error")
                 },
                 _ => runtime_error(operator, "Right operand must be a String.")
             },
