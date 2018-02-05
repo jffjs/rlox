@@ -5,11 +5,11 @@ use env::Environment;
 use token;
 
 impl<'a> ast::Stmt<'a> {
-    pub fn execute(self, env: &mut Environment) -> Result<(), RuntimeError> {
+    pub fn execute(&self, env: &mut Environment) -> Result<(), RuntimeError> {
         match self {
-            ast::Stmt::Block(block_stmt) => {
+            &ast::Stmt::Block(ref block_stmt) => {
                 env.push_scope();
-                for statement in block_stmt.statements {
+                for statement in &block_stmt.statements {
                     match statement.execute(env) {
                         Ok(_) => (),
                         Err(err) => return Err(err)
@@ -18,34 +18,42 @@ impl<'a> ast::Stmt<'a> {
                 env.pop_scope();
                 Ok(())
             },
-            ast::Stmt::Expr(expr_stmt) => {
+            &ast::Stmt::Expr(ref expr_stmt) => {
                 expr_stmt.expression.evaluate(env)?;
                 Ok(())
             },
-            ast::Stmt::If(if_stmt) => {
+            &ast::Stmt::If(ref if_stmt) => {
                 let condition = if_stmt.condition.evaluate(env)?;
                 if is_truthy(&condition) {
                     if_stmt.then_branch.execute(env)?;
                 } else {
                     match if_stmt.else_branch {
-                        Some(else_branch) => else_branch.execute(env)?,
+                        Some(ref else_branch) => else_branch.execute(env)?,
                         None => ()
                     }
                 }
                 Ok(())
             },
-            ast::Stmt::Print(print_stmt) => {
+            &ast::Stmt::Print(ref print_stmt) => {
                 let expr_result = print_stmt.expression.evaluate(env)?;
                 println!("{}", expr_result.print());
                 Ok(())
             },
-            ast::Stmt::Var(var_stmt) => {
+            &ast::Stmt::Var(ref var_stmt) => {
                 let value;
                 match var_stmt.initializer {
-                    Some(initializer) => value = initializer.evaluate(env)?,
+                    Some(ref initializer) => value = initializer.evaluate(env)?,
                     None => value = EvalResult::Nil
                 }
                 env.define(var_stmt.name.lexeme.clone(), value);
+                Ok(())
+            },
+            &ast::Stmt::While(ref while_stmt) => {
+                let mut condition = while_stmt.condition.evaluate(env)?;
+                while is_truthy(&condition) {
+                    while_stmt.body.execute(env)?;
+                    condition = while_stmt.condition.evaluate(env)?;
+                }
                 Ok(())
             }
         }
@@ -92,42 +100,9 @@ impl EvalResult {
 }
 
 impl<'a> ast::Expr<'a> {
-    pub fn evaluate(self, env: &mut Environment) -> Result<EvalResult, RuntimeError> {
+    pub fn evaluate(&self, env: &mut Environment) -> Result<EvalResult, RuntimeError> {
         match self {
-            ast::Expr::Literal(lit_expr) => match lit_expr.value {
-                token::Literal::Nil => Ok(EvalResult::Nil),
-                token::Literal::True => Ok(EvalResult::Boolean(true)),
-                token::Literal::False => Ok(EvalResult::Boolean(false)),
-                token::Literal::Number(n) => Ok(EvalResult::Number(n)),
-                token::Literal::String(s) => Ok(EvalResult::String(s.clone()))
-            },
-            ast::Expr::Grouping(group_expr) => group_expr.expression.evaluate(env),
-            ast::Expr::Unary(unary_expr) => {
-                let right = unary_expr.right.evaluate(env)?;
-                let operator = unary_expr.operator;
-                match operator.token_type {
-                    token::TokenType::Minus => match right {
-                        EvalResult::Number(n) => Ok(EvalResult::Number(-n)),
-                        _ => runtime_error(&operator, "Operand must be a number.")
-                    },
-                    token::TokenType::Bang => Ok(EvalResult::Boolean(!is_truthy(&right))),
-                    _ => panic!("Invalid unary expression. Check parser.")
-                }
-            },
-            ast::Expr::Binary(bin_expr) => {
-                let left = bin_expr.left.evaluate(env);
-                let right = bin_expr.right.evaluate(env);
-                let operator = bin_expr.operator;
-                eval_binary_expr(&operator, left?, right?)
-            },
-            ast::Expr::Variable(var_expr) => {
-                let name = &var_expr.name;
-                match env.get(&name.lexeme) {
-                    Some(val) => Ok(val.clone()),
-                    None => runtime_error(name, &format!("Undefined variable '{}'", name.lexeme))
-                }
-            },
-            ast::Expr::Assign(assign_expr) => {
+            &ast::Expr::Assign(ref assign_expr) => {
                 let name = assign_expr.name;
                 let value = assign_expr.value.evaluate(env)?;
                 match env.assign(name.lexeme.clone(), value.clone()) {
@@ -135,7 +110,21 @@ impl<'a> ast::Expr<'a> {
                     Err(msg) => runtime_error(name, &msg)
                 }
             },
-            ast::Expr::Logical(logical_expr) => {
+            &ast::Expr::Binary(ref bin_expr) => {
+                let left = bin_expr.left.evaluate(env);
+                let right = bin_expr.right.evaluate(env);
+                let operator = bin_expr.operator;
+                eval_binary_expr(&operator, left?, right?)
+            },
+            &ast::Expr::Grouping(ref group_expr) => group_expr.expression.evaluate(env),
+            &ast::Expr::Literal(ref lit_expr) => match &lit_expr.value {
+                &token::Literal::Nil => Ok(EvalResult::Nil),
+                &token::Literal::True => Ok(EvalResult::Boolean(true)),
+                &token::Literal::False => Ok(EvalResult::Boolean(false)),
+                &token::Literal::Number(n) => Ok(EvalResult::Number(n)),
+                &token::Literal::String(ref s) => Ok(EvalResult::String(s.clone()))
+            },
+            &ast::Expr::Logical(ref logical_expr) => {
                 let left = logical_expr.left.evaluate(env)?;
                 match logical_expr.operator.token_type {
                     token::TokenType::Or => {
@@ -155,6 +144,25 @@ impl<'a> ast::Expr<'a> {
                     _ => panic!("Invalid logical epxression. Check parser.")
                 }
             }
+            &ast::Expr::Unary(ref unary_expr) => {
+                let right = unary_expr.right.evaluate(env)?;
+                let operator = unary_expr.operator;
+                match operator.token_type {
+                    token::TokenType::Minus => match right {
+                        EvalResult::Number(n) => Ok(EvalResult::Number(-n)),
+                        _ => runtime_error(&operator, "Operand must be a number.")
+                    },
+                    token::TokenType::Bang => Ok(EvalResult::Boolean(!is_truthy(&right))),
+                    _ => panic!("Invalid unary expression. Check parser.")
+                }
+            },
+            &ast::Expr::Variable(ref var_expr) => {
+                let name = &var_expr.name;
+                match env.get(&name.lexeme) {
+                    Some(val) => Ok(val.clone()),
+                    None => runtime_error(name, &format!("Undefined variable '{}'", name.lexeme))
+                }
+            },
             // _ => panic!("I don't know how to evaluate this yet.")
         }
     }

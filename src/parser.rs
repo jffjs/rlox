@@ -5,6 +5,7 @@ use token::{Literal, Token, TokenType};
 
 enum StmtResult<'a> {
     Ok(ast::Stmt<'a>, usize),
+
     Err(&'a str, usize)
 }
 
@@ -102,8 +103,10 @@ fn var_declaration(tokens: &Vec<Token>, mut pos: usize) -> StmtResult {
 fn statement(tokens: &Vec<Token>, pos: usize) -> StmtResult {
     match tokens[pos].token_type {
         TokenType::If => if_statement(tokens, pos + 1),
+        TokenType::For => for_statement(tokens, pos + 1),
         TokenType::LeftBrace => block_statement(tokens, pos +1),
         TokenType::Print => print_statement(tokens, pos + 1),
+        TokenType::While => while_statement(tokens, pos + 1),
         _ => expression_statement(tokens, pos)
     }
 }
@@ -128,6 +131,115 @@ fn if_statement(tokens: &Vec<Token>, pos: usize) -> StmtResult {
             ExprResult::Err(msg, pos) => StmtResult::Err(msg, pos)
         },
         _ => StmtResult::Err("Expect '(' after 'if'.", pos)
+    }
+}
+
+fn for_statement(tokens: &Vec<Token>, mut pos: usize) -> StmtResult {
+    let mut initializer = None;
+    let mut condition = None;
+    let mut increment = None;
+    match tokens[pos].token_type {
+        TokenType::LeftParen => {
+            if let Some(stmt_result) = for_stmt_initializer(tokens, pos + 1) {
+                match stmt_result {
+                    StmtResult::Ok(init, next_pos) => {
+                        initializer = Some(init);
+                        pos = next_pos;
+                    },
+                    StmtResult::Err(msg, pos) => return StmtResult::Err(msg, pos)
+                }
+            } else {
+                pos = pos + 2;
+            }
+
+            if let Some(expr_result) = for_stmt_condition(tokens, pos) {
+                match expr_result {
+                    ExprResult::Ok(cond, next_pos) => {
+                        condition = Some(cond);
+                        pos = next_pos;
+                    },
+                    ExprResult::Err(msg, pos) => return StmtResult::Err(msg, pos)
+                }
+            }
+
+            match tokens[pos].token_type {
+                TokenType::Semicolon => pos = pos + 1,
+                _ => return StmtResult::Err("Expect ';' after loop condition.", pos)
+            }
+
+            if let Some(expr_result) = for_stmt_increment(tokens, pos) {
+                match expr_result {
+                    ExprResult::Ok(inc, next_pos) => {
+                        increment = Some(inc);
+                        pos = next_pos;
+                    },
+                    ExprResult::Err(msg, pos) => return StmtResult::Err(msg, pos)
+                }
+            }
+
+            match tokens[pos].token_type {
+                TokenType::RightParen => pos = pos + 1,
+                _ => return StmtResult::Err("Expect ')' after for clauses.", pos)
+            }
+
+            match statement(tokens, pos) {
+                StmtResult::Ok(body, pos) => {
+                    let mut tree = match increment {
+                        Some(inc_expr) => ast::Stmt::block(vec![body, ast::Stmt::expr(inc_expr)]),
+                        None => body
+                    };
+                    tree = match condition {
+                        Some(cond_expr) => ast::Stmt::while_loop(cond_expr, tree),
+                        None => ast::Stmt::while_loop(ast::Expr::literal(Literal::True), tree)
+                    };
+                    match initializer {
+                        Some(init_stmt) => StmtResult::Ok(ast::Stmt::block(vec![init_stmt, tree]), pos),
+                        None => StmtResult::Ok(tree, pos)
+                    }
+
+                },
+                StmtResult::Err(msg, pos) => StmtResult::Err(msg, pos)
+            }
+        },
+        _ => StmtResult::Err("Expect '(' after 'for'.", pos)
+    }
+}
+
+fn for_stmt_initializer(tokens: &Vec<Token>, pos: usize) -> Option<StmtResult> {
+    match tokens[pos].token_type {
+        TokenType::Semicolon => None,
+        TokenType::Var => Some(var_declaration(tokens, pos + 1)),
+        _ => Some(expression_statement(tokens, pos + 1))
+    }
+}
+
+fn for_stmt_condition(tokens: &Vec<Token>, pos: usize) -> Option<ExprResult> {
+    match tokens[pos].token_type {
+        TokenType::Semicolon => None,
+        _ => Some(expression(tokens, pos))
+    }
+}
+
+fn for_stmt_increment(tokens: &Vec<Token>, pos: usize) -> Option<ExprResult> {
+    match tokens[pos].token_type {
+        TokenType::RightParen => None,
+        _ => Some(expression(tokens, pos))
+    }
+}
+
+fn while_statement(tokens: &Vec<Token>, pos: usize) -> StmtResult {
+    match tokens[pos].token_type {
+        TokenType::LeftParen => match expression(tokens, pos + 1) {
+            ExprResult::Ok(condition, pos) => match tokens[pos].token_type {
+                TokenType::RightParen => match statement(tokens, pos + 1) {
+                    StmtResult::Ok(body, pos) => StmtResult::Ok(ast::Stmt::while_loop(condition, body), pos),
+                    StmtResult::Err(msg, pos) => StmtResult::Err(msg, pos)
+                },
+                _ => StmtResult::Err("Expect ')' after if condition.", pos)
+            },
+            ExprResult::Err(msg, pos) => StmtResult::Err(msg, pos)
+        },
+        _ => StmtResult::Err("Expect '(' after 'while'.", pos)
     }
 }
 

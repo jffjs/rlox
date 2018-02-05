@@ -7,7 +7,8 @@ pub enum Stmt<'a> {
     Expr(ExprStmt<'a>),
     If(IfStmt<'a>),
     Print(PrintStmt<'a>),
-    Var(VarStmt<'a>)
+    Var(VarStmt<'a>),
+    While(WhileStmt<'a>)
 }
 
 impl<'a> Stmt<'a> {
@@ -36,7 +37,11 @@ impl<'a> Stmt<'a> {
     }
 
     pub fn var_init(name: &'a Token, initializer: Expr<'a>) -> Stmt<'a> {
-        Stmt::Var(VarStmt::new(name, Some(Box::new(initializer))))
+        Stmt::Var(VarStmt::new(name, Some(initializer)))
+    }
+
+    pub fn while_loop(condition: Expr<'a>, body: Stmt<'a>) -> Stmt<'a> {
+        Stmt::While(WhileStmt::new(condition, body))
     }
 }
 
@@ -53,12 +58,12 @@ impl<'a> BlockStmt<'a> {
 
 #[derive(Debug)]
 pub struct ExprStmt<'a> {
-    pub expression: Box<Expr<'a>>
+    pub expression: Expr<'a>
 }
 
 impl<'a> ExprStmt<'a> {
     fn new(expression: Expr<'a>) -> ExprStmt<'a> {
-        ExprStmt { expression: Box::new(expression) }
+        ExprStmt { expression }
     }
 }
 
@@ -77,24 +82,36 @@ impl<'a> IfStmt<'a> {
 
 #[derive(Debug)]
 pub struct PrintStmt<'a> {
-    pub expression: Box<Expr<'a>>
+    pub expression: Expr<'a>
 }
 
 impl<'a> PrintStmt<'a> {
     fn new(expression: Expr<'a>) -> PrintStmt<'a> {
-        PrintStmt { expression: Box::new(expression) }
+        PrintStmt { expression }
     }
 }
 
 #[derive(Debug)]
 pub struct VarStmt<'a> {
     pub name: &'a Token,
-    pub initializer: Option<Box<Expr<'a>>>
+    pub initializer: Option<Expr<'a>>
 }
 
 impl<'a> VarStmt<'a> {
-    fn new(name: &'a Token, initializer: Option<Box<Expr<'a>>>) -> VarStmt<'a> {
+    fn new(name: &'a Token, initializer: Option<Expr<'a>>) -> VarStmt<'a> {
         VarStmt { name, initializer }
+    }
+}
+
+#[derive(Debug)]
+pub struct WhileStmt<'a> {
+    pub condition: Expr<'a>,
+    pub body: Box<Stmt<'a>>
+}
+
+impl<'a> WhileStmt<'a> {
+    fn new(condition: Expr<'a>, body: Stmt<'a>) -> WhileStmt<'a> {
+        WhileStmt { condition, body: Box::new(body) }
     }
 }
 
