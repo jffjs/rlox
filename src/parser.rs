@@ -461,7 +461,55 @@ fn unary(tokens: &Vec<Token>, pos: usize) -> ExprResult {
                 ExprResult::Err(msg, pos)
         }
     } else {
-        primary(tokens, pos)
+        call(tokens, pos)
+    }
+}
+
+fn call(tokens: &Vec<Token>, pos: usize) -> ExprResult {
+    match primary(tokens, pos) {
+        ExprResult::Ok(mut expr, mut pos) => {
+            loop {
+                match tokens[pos].token_type {
+                    TokenType::LeftParen => {
+                        let mut args: Vec<ast::Expr> = vec![];
+                        if !check_token(&tokens[pos], TokenType::RightParen) {
+                            loop {
+                                if args.len() >= 8 {
+                                    return ExprResult::Err("Cannot have more than 8 arguments.", pos);
+                                }
+                                match expression(tokens, pos + 1) {
+                                    ExprResult::Ok(arg, next_pos) => {
+                                        args.push(arg);
+                                        pos = next_pos;
+                                    },
+                                    ExprResult::Err(msg, pos) =>
+                                        return ExprResult::Err(msg, pos)
+                                }
+
+                                match tokens[pos].token_type {
+                                    TokenType::Comma => pos = pos + 1,
+                                    _ => break
+                                }
+                            }
+                        }
+
+                        let paren;
+                        match tokens[pos].token_type {
+                            TokenType::RightParen => {
+                                paren = &tokens[pos];
+                                pos = pos + 1;
+                            }
+                            _ => return ExprResult::Err("Expect ')' after arguments.", pos)
+                        }
+
+                        expr = ast::Expr::call(expr, paren, args);
+                    },
+                    _ => break
+                }
+            }
+            ExprResult::Ok(expr, pos)
+        },
+        ExprResult::Err(msg, pos) => ExprResult::Err(msg, pos)
     }
 }
 
@@ -510,6 +558,14 @@ fn match_type(token: &Token, tok_types: Vec<TokenType>) -> bool {
         }
     }
     false
+}
+
+fn check_token(token: &Token, tok_type: TokenType) -> bool {
+    if token.token_type == TokenType::Eof {
+        false
+    } else {
+        token.token_type == tok_type
+    }
 }
 
 #[derive(Debug)]

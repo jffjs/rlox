@@ -119,6 +119,7 @@ impl<'a> WhileStmt<'a> {
 pub enum Expr<'a> {
     Assign(AssignExpr<'a>),
     Binary(BinaryExpr<'a>),
+    Call(CallExpr<'a>),
     Grouping(GroupingExpr<'a>),
     Literal(LiteralExpr),
     Logical(LogicalExpr<'a>),
@@ -149,7 +150,8 @@ impl<'a> fmt::Display for Expr<'a> {
             },
             &Expr::Variable(ref var_expr) => {
                 write!(f, "{}", &var_expr.name.lexeme)
-            }
+            },
+            _ => write!(f, "")
         }
     }
 }
@@ -175,8 +177,12 @@ impl<'a> Expr<'a> {
         Expr::Binary(BinaryExpr::new(left, operator, right))
     }
 
-    pub fn unary(operator: &'a Token, right: Expr<'a>) -> Expr<'a> {
-        Expr::Unary(UnaryExpr::new(operator, right))
+    pub fn call(callee: Expr<'a>, paren: &'a Token, args: Vec<Expr<'a>>) -> Expr<'a> {
+        Expr::Call(CallExpr::new(callee, paren, args))
+    }
+
+    pub fn grouping(expr: Expr) -> Expr {
+        Expr::Grouping(GroupingExpr::new(expr))
     }
 
     pub fn literal(lit: Literal) -> Expr<'a> {
@@ -187,8 +193,8 @@ impl<'a> Expr<'a> {
         Expr::Logical(LogicalExpr::new(left, operator, right))
     }
 
-    pub fn grouping(expr: Expr) -> Expr {
-        Expr::Grouping(GroupingExpr::new(expr))
+    pub fn unary(operator: &'a Token, right: Expr<'a>) -> Expr<'a> {
+        Expr::Unary(UnaryExpr::new(operator, right))
     }
 
     pub fn variable(name: &'a Token) -> Expr<'a> {
@@ -218,6 +224,19 @@ pub struct BinaryExpr<'a> {
 impl<'a> BinaryExpr<'a> {
     fn new(left: Expr<'a>, operator: &'a Token, right: Expr<'a>) -> BinaryExpr<'a> {
         BinaryExpr { left: Box::new(left), operator, right: Box::new(right) }
+    }
+}
+
+#[derive(Debug)]
+pub struct CallExpr<'a> {
+    pub callee: Box<Expr<'a>>,
+    pub paren: &'a Token,
+    pub arguments: Vec<Expr<'a>>
+}
+
+impl<'a> CallExpr<'a> {
+    fn new(callee: Expr<'a>, paren: &'a Token, arguments: Vec<Expr<'a>>) -> CallExpr<'a> {
+        CallExpr { callee: Box::new(callee), paren, arguments }
     }
 }
 

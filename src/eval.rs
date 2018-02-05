@@ -163,7 +163,7 @@ impl<'a> ast::Expr<'a> {
                     None => runtime_error(name, &format!("Undefined variable '{}'", name.lexeme))
                 }
             },
-            // _ => panic!("I don't know how to evaluate this yet.")
+            _ => panic!("I don't know how to evaluate this yet.")
         }
     }
 }
