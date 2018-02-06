@@ -64,10 +64,56 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Vec<ast::Stmt>, Vec<Box<Error>>> {
 }
 
 fn declaration(tokens: &Vec<Token>, pos: usize) -> StmtResult {
-    if match_type(&tokens[pos], vec![TokenType::Var]) {
-        var_declaration(tokens, pos + 1)
-    } else {
-        statement(tokens, pos)
+    match tokens[pos].token_type {
+        TokenType::Fun => fun_declaration(tokens, pos + 1),
+        TokenType::Var => var_declaration(tokens, pos + 1),
+        _ => statement(tokens, pos)
+    }
+}
+
+fn fun_declaration<'a>(tokens: &'a Vec<Token>, mut pos: usize) -> StmtResult<'a> {
+    match tokens[pos].token_type {
+        TokenType::Identifier => {
+            let name = &tokens[pos];
+            pos += 1;
+            match tokens[pos].token_type {
+                TokenType::LeftParen => {
+                    pos += 1;
+                    let mut params: Vec<&Token> = vec![];
+                    if !check_token(&tokens[pos], TokenType::RightParen) {
+                        loop {
+                            if params.len() >= 8 {
+                                return StmtResult::Err("Cannot have more than 8 arguments.", pos);
+                            }
+
+                            match tokens[pos].token_type {
+                                TokenType::Identifier => params.push(&tokens[pos]),
+                                _ => return StmtResult::Err("Expect parameter name.", pos)
+                            };
+
+                            pos += 1;
+                            match tokens[pos].token_type {
+                                TokenType::Comma => pos = pos + 1,
+                                _ => break
+                            }
+                        }
+                    }
+
+                    match tokens[pos].token_type {
+                        TokenType::RightParen => match tokens[pos + 1].token_type {
+                            TokenType::LeftBrace => match block_statement(tokens, pos + 2) {
+                                StmtResult::Ok(body, pos) => StmtResult::Ok(ast::Stmt::function(name, params, body), pos),
+                                StmtResult::Err(msg, pos) => StmtResult::Err(msg, pos)
+                            },
+                            _ => StmtResult::Err("Expect '{{' before function or method body.", pos)
+                        },
+                        _ => StmtResult::Err("Expect ')' after parameters.", pos)
+                    }
+                },
+                _ => StmtResult::Err("Expect '(' after function or method name.", pos)
+            }
+        },
+        _ => StmtResult::Err("Expect function or method name.", pos)
     }
 }
 

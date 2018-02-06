@@ -22,6 +22,9 @@ impl<'a> ast::Stmt<'a> {
                 expr_stmt.expression.evaluate(env)?;
                 Ok(())
             },
+            &ast::Stmt::Fun(ref fun_stmt) => {
+                Ok(())
+            }
             &ast::Stmt::If(ref if_stmt) => {
                 let condition = if_stmt.condition.evaluate(env)?;
                 if is_truthy(&condition) {
@@ -60,26 +63,15 @@ impl<'a> ast::Stmt<'a> {
     }
 }
 
-trait Callable {
-    fn call(&self, env: &mut Environment, args: Vec<Value>) -> Result<Value, RuntimeError>;
-}
-
 #[derive(Debug, PartialEq)]
 pub enum Value {
     Nil,
     Boolean(bool),
+    // Class(Class),
     Function(Function),
+    // NativeFun(NativeFun),
     Number(f64),
     String(String),
-}
-
-impl Callable for Value {
-    fn call(&self, env: &mut Environment, args: Vec<Value>) -> Result<Value, RuntimeError> {
-        match self {
-            &Value::Function(ref fun) => Ok(fun.call(env, args)),
-            _ => panic!("Value is not callable. This is an uncaught parse error.")
-        }
-    }
 }
 
 impl fmt::Display for Value {
@@ -116,15 +108,42 @@ impl Value {
     }
 }
 
+trait Callable {
+    fn arity(&self) -> usize;
+    fn call(&self, env: &mut Environment, args: Vec<Value>) -> Result<Value, RuntimeError>;
+}
+
+fn call<T: Callable>(paren: &token::Token, callee: T, env: &mut Environment, args: Vec<Value>) -> Result<Value, RuntimeError> {
+    if callee.arity() != args.len() {
+        return runtime_error(paren, &format!("Expected {} arguments but got {}.", callee.arity(), args.len()))
+    }
+    callee.call(env, args)
+}
+
+
 #[derive(Debug, PartialEq)]
 pub struct Function {
 }
 
-impl Function {
-    fn call(&self, env: &mut Environment, args: Vec<Value>) -> Value{
-        Value::Nil
+impl Callable for Function {
+    fn arity(&self) -> usize {
+        1
+    }
+
+    fn call(&self, env: &mut Environment, args: Vec<Value>) -> Result<Value, RuntimeError> {
+        Ok(Value::Nil)
     }
 }
+
+// #[derive(Debug, PartialEq)]
+// pub struct Class {
+// }
+
+// impl Callable for Class {
+//     fn call(&self, env: &mut Environment, args: Vec<Value>) -> Value {
+//         Value::Nil
+//     }
+// }
 
 impl<'a> ast::Expr<'a> {
     pub fn evaluate(&self, env: &mut Environment) -> Result<Value, RuntimeError> {
@@ -151,7 +170,8 @@ impl<'a> ast::Expr<'a> {
                 }
 
                 match callee {
-                    Value::Function(_) => callee.call(env, arguments),
+                    Value::Function(fun) => call(call_expr.paren, fun, env, arguments),
+                    // Value::Class(class) => call(class, env, arguments),
                     _ => runtime_error(&call_expr.paren, "Can only call functions and classes.")
                 }
             },
@@ -236,7 +256,7 @@ fn is_equal(a: Value, b: Value) -> bool {
         Value::String(a_str) => match b {
             Value::String(b_str) => a_str.eq(&b_str),
             _ => false
-        },
+        }
     }
 }
 

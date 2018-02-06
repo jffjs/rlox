@@ -5,6 +5,7 @@ use token::{Literal, Token};
 pub enum Stmt<'a> {
     Block(BlockStmt<'a>),
     Expr(ExprStmt<'a>),
+    Fun(FunStmt<'a>),
     If(IfStmt<'a>),
     Print(PrintStmt<'a>),
     Var(VarStmt<'a>),
@@ -18,6 +19,10 @@ impl<'a> Stmt<'a> {
 
     pub fn expr(expression: Expr<'a>) -> Stmt<'a> {
         Stmt::Expr(ExprStmt::new(expression))
+    }
+
+    pub fn function(name: &'a Token, params: Vec<&'a Token>, body: Stmt<'a>) -> Stmt<'a> {
+        Stmt::Fun(FunStmt::new(name, params, body))
     }
 
     pub fn if_then(condition: Expr<'a>, then_branch: Stmt<'a>) -> Stmt<'a> {
@@ -64,6 +69,19 @@ pub struct ExprStmt<'a> {
 impl<'a> ExprStmt<'a> {
     fn new(expression: Expr<'a>) -> ExprStmt<'a> {
         ExprStmt { expression }
+    }
+}
+
+#[derive(Debug)]
+pub struct FunStmt<'a> {
+    pub name: &'a Token,
+    pub parameters: Vec<&'a Token>,
+    pub body: Box<Stmt<'a>>
+}
+
+impl<'a> FunStmt<'a> {
+    fn new(name: &'a Token, parameters: Vec<&'a Token>, body: Stmt<'a>) -> FunStmt<'a> {
+        FunStmt { name, parameters, body: Box::new(body) }
     }
 }
 
