@@ -12,7 +12,10 @@ impl ast::Stmt {
                 for statement in &block_stmt.statements {
                     match statement.execute(env) {
                         Ok(_) => (),
-                        Err(err) => return Err(err)
+                        Err(err) => {
+                            env.pop_scope();
+                            return Err(err);
+                        }
                     }
                 }
                 env.pop_scope();
@@ -23,6 +26,8 @@ impl ast::Stmt {
                 Ok(())
             },
             &ast::Stmt::Fun(ref fun_stmt) => {
+                let fun = LoxFunction::new(fun_stmt.clone());
+                env.define(fun.declaration.name.lexeme.clone(), Value::Function(fun));
                 Ok(())
             }
             &ast::Stmt::If(ref if_stmt) => {
@@ -68,7 +73,7 @@ pub enum Value {
     Nil,
     Boolean(bool),
     // Class(Class),
-    Function(Function),
+    Function(LoxFunction),
     // NativeFun(NativeFun),
     Number(f64),
     String(String),
@@ -79,7 +84,7 @@ impl fmt::Display for Value {
         match self {
             &Value::Nil => write!(f, "nil"),
             &Value::Boolean(b) => write!(f, "{}", b),
-            &Value::Function(ref fun) => write!(f, ""), // TODO: implement
+            &Value::Function(ref fun) => write!(f, "<fun {}>", fun),
             &Value::Number(n) => write!(f, "{}", n),
             &Value::String(ref s) => write!(f, "\"{}\"", s)
         }
@@ -91,7 +96,7 @@ impl Value {
         match self {
             &Value::Nil => format!("nil"),
             &Value::Boolean(b) => format!("{}", b),
-            &Value::Function(ref fun) => format!("fun"), // TODO: implement
+            &Value::Function(ref fun) => format!("{}", fun),
             &Value::Number(n) => format!("{}", n),
             &Value::String(ref s) => format!("{}", s)
         }
@@ -111,17 +116,39 @@ fn call<T: Callable>(paren: &token::Token, callee: T, env: &mut Environment, arg
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Function {
+pub struct LoxFunction {
     pub declaration: ast::FunStmt
 }
 
-impl Callable for Function {
+impl LoxFunction {
+    pub fn new(declaration: ast::FunStmt) -> LoxFunction {
+        LoxFunction { declaration }
+    }
+}
+
+impl Callable for LoxFunction {
     fn arity(&self) -> usize {
-        1
+        self.declaration.parameters.len()
     }
 
     fn call(&self, env: &mut Environment, args: Vec<Value>) -> Result<Value, RuntimeError> {
-        Ok(Value::Nil)
+        env.push_scope();
+        for (i, param) in self.declaration.parameters.iter().enumerate() {
+            env.define(param.lexeme.clone(), args[i].clone());
+        }
+
+        let result = match self.declaration.body.execute(env) {
+            Ok(_) => Ok(Value::Nil),
+            Err(err) => Err(err)
+        };
+        env.pop_scope();
+        result
+    }
+}
+
+impl fmt::Display for LoxFunction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "<fun {}>", self.declaration.name.lexeme)
     }
 }
 
