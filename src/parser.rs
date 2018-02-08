@@ -518,12 +518,13 @@ fn call(tokens: &Vec<Token>, pos: usize) -> ExprResult {
                 match tokens[pos].token_type {
                     TokenType::LeftParen => {
                         let mut args: Vec<ast::Expr> = vec![];
+                        pos += 1;
                         if !check_token(&tokens[pos], TokenType::RightParen) {
                             loop {
                                 if args.len() >= 8 {
                                     return ExprResult::Err("Cannot have more than 8 arguments.", pos);
                                 }
-                                match expression(tokens, pos + 1) {
+                                match expression(tokens, pos) {
                                     ExprResult::Ok(arg, next_pos) => {
                                         args.push(arg);
                                         pos = next_pos;
@@ -533,7 +534,7 @@ fn call(tokens: &Vec<Token>, pos: usize) -> ExprResult {
                                 }
 
                                 match tokens[pos].token_type {
-                                    TokenType::Comma => pos = pos + 1,
+                                    TokenType::Comma => pos += 1,
                                     _ => break
                                 }
                             }
@@ -543,7 +544,7 @@ fn call(tokens: &Vec<Token>, pos: usize) -> ExprResult {
                         match tokens[pos].token_type {
                             TokenType::RightParen => {
                                 paren = &tokens[pos];
-                                pos = pos + 1;
+                                pos += 1;
                             }
                             _ => return ExprResult::Err("Expect ')' after arguments.", pos)
                         }
