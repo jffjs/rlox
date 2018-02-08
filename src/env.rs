@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use eval::Value;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Environment {
     scopes: Vec<HashMap<String, Value>>,
     current_scope: usize

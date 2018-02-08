@@ -5,13 +5,17 @@ use env::Environment;
 use token;
 
 impl ast::Stmt {
-    pub fn execute(&self, env: &mut Environment) -> Result<(), RuntimeError> {
+    pub fn execute(&self, env: &mut Environment) -> Result<Option<Value>, RuntimeError> {
         match self {
             &ast::Stmt::Block(ref block_stmt) => {
                 env.push_scope();
                 for statement in &block_stmt.statements {
                     match statement.execute(env) {
-                        Ok(_) => (),
+                        Ok(None) => (),
+                        Ok(Some(v)) => {
+                            env.pop_scope();
+                            return Ok(Some(v));
+                        }
                         Err(err) => {
                             env.pop_scope();
                             return Err(err);
@@ -19,33 +23,32 @@ impl ast::Stmt {
                     }
                 }
                 env.pop_scope();
-                Ok(())
+                Ok(None)
             },
             &ast::Stmt::Expr(ref expr_stmt) => {
                 expr_stmt.expression.evaluate(env)?;
-                Ok(())
+                Ok(None)
             },
             &ast::Stmt::Fun(ref fun_stmt) => {
                 let fun = LoxFunction::new(fun_stmt.clone());
                 env.define(fun.declaration.name.lexeme.clone(), Value::Function(fun));
-                Ok(())
+                Ok(None)
             }
             &ast::Stmt::If(ref if_stmt) => {
                 let condition = if_stmt.condition.evaluate(env)?;
                 if is_truthy(&condition) {
-                    if_stmt.then_branch.execute(env)?;
+                    Ok(if_stmt.then_branch.execute(env)?)
                 } else {
                     match if_stmt.else_branch {
-                        Some(ref else_branch) => else_branch.execute(env)?,
-                        None => ()
+                        Some(ref else_branch) => Ok(else_branch.execute(env)?),
+                        None => Ok(None)
                     }
                 }
-                Ok(())
             },
             &ast::Stmt::Print(ref print_stmt) => {
                 let expr_result = print_stmt.expression.evaluate(env)?;
                 println!("{}", expr_result.print());
-                Ok(())
+                Ok(None)
             },
             &ast::Stmt::Var(ref var_stmt) => {
                 let value;
@@ -54,15 +57,19 @@ impl ast::Stmt {
                     None => value = Value::Nil
                 }
                 env.define(var_stmt.name.lexeme.clone(), value);
-                Ok(())
+                Ok(None)
             },
             &ast::Stmt::While(ref while_stmt) => {
                 let mut condition = while_stmt.condition.evaluate(env)?;
                 while is_truthy(&condition) {
-                    while_stmt.body.execute(env)?;
+                    match while_stmt.body.execute(env) {
+                        Ok(None) => (),
+                        Ok(Some(v)) => return Ok(Some(v)),
+                        Err(err) => return Err(err)
+                    }
                     condition = while_stmt.condition.evaluate(env)?;
                 }
-                Ok(())
+                Ok(None)
             }
         }
     }
