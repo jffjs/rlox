@@ -4,13 +4,13 @@ use ast;
 use token::{Literal, Token, TokenType};
 
 enum StmtResult<'a> {
-    Ok(ast::Stmt<'a>, usize),
+    Ok(ast::Stmt, usize),
 
     Err(&'a str, usize)
 }
 
 enum ExprResult<'a> {
-    Ok(ast::Expr<'a>, usize),
+    Ok(ast::Expr, usize),
     Err(&'a str, usize)
 }
 
@@ -79,7 +79,7 @@ fn fun_declaration<'a>(tokens: &'a Vec<Token>, mut pos: usize) -> StmtResult<'a>
             match tokens[pos].token_type {
                 TokenType::LeftParen => {
                     pos += 1;
-                    let mut params: Vec<&Token> = vec![];
+                    let mut params: Vec<Token> = vec![];
                     if !check_token(&tokens[pos], TokenType::RightParen) {
                         loop {
                             if params.len() >= 8 {
@@ -87,7 +87,7 @@ fn fun_declaration<'a>(tokens: &'a Vec<Token>, mut pos: usize) -> StmtResult<'a>
                             }
 
                             match tokens[pos].token_type {
-                                TokenType::Identifier => params.push(&tokens[pos]),
+                                TokenType::Identifier => params.push(tokens[pos].clone()),
                                 _ => return StmtResult::Err("Expect parameter name.", pos)
                             };
 
@@ -355,7 +355,7 @@ fn assignment(tokens: &Vec<Token>, pos: usize) -> ExprResult {
                     ast::Expr::Variable(var_expr) => {
                         let name = var_expr.name;
                         match value {
-                            ExprResult::Ok(val_expr, pos) => ExprResult::Ok(ast::Expr::assign(name, val_expr), pos),
+                            ExprResult::Ok(val_expr, pos) => ExprResult::Ok(ast::Expr::assign(&name, val_expr), pos),
                             ExprResult::Err(msg, pos) => ExprResult::Err(msg, pos)
                         }
                     },

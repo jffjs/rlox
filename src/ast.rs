@@ -2,150 +2,150 @@ use std::fmt;
 use token::{Literal, Token};
 
 #[derive(Debug)]
-pub enum Stmt<'a> {
-    Block(BlockStmt<'a>),
-    Expr(ExprStmt<'a>),
-    Fun(FunStmt<'a>),
-    If(IfStmt<'a>),
-    Print(PrintStmt<'a>),
-    Var(VarStmt<'a>),
-    While(WhileStmt<'a>)
+pub enum Stmt {
+    Block(BlockStmt),
+    Expr(ExprStmt),
+    Fun(FunStmt),
+    If(IfStmt),
+    Print(PrintStmt),
+    Var(VarStmt),
+    While(WhileStmt)
 }
 
-impl<'a> Stmt<'a> {
-    pub fn block(statements: Vec<Stmt<'a>>) -> Stmt<'a> {
+impl Stmt {
+    pub fn block(statements: Vec<Stmt>) -> Stmt {
         Stmt::Block(BlockStmt::new(statements))
     }
 
-    pub fn expr(expression: Expr<'a>) -> Stmt<'a> {
+    pub fn expr(expression: Expr) -> Stmt {
         Stmt::Expr(ExprStmt::new(expression))
     }
 
-    pub fn function(name: &'a Token, params: Vec<&'a Token>, body: Stmt<'a>) -> Stmt<'a> {
-        Stmt::Fun(FunStmt::new(name, params, body))
+    pub fn function(name: &Token, params: Vec<Token>, body: Stmt) -> Stmt {
+        Stmt::Fun(FunStmt::new(name.clone(), params, body))
     }
 
-    pub fn if_then(condition: Expr<'a>, then_branch: Stmt<'a>) -> Stmt<'a> {
+    pub fn if_then(condition: Expr, then_branch: Stmt) -> Stmt {
         Stmt::If(IfStmt::new(condition, then_branch, None))
     }
 
-    pub fn if_then_else(condition: Expr<'a>, then_branch: Stmt<'a>, else_branch: Stmt<'a>) -> Stmt<'a> {
+    pub fn if_then_else(condition: Expr, then_branch: Stmt, else_branch: Stmt) -> Stmt {
         Stmt::If(IfStmt::new(condition, then_branch, Some(Box::new(else_branch))))
     }
 
-    pub fn print(expression: Expr<'a>) -> Stmt<'a> {
+    pub fn print(expression: Expr) -> Stmt {
         Stmt::Print(PrintStmt::new(expression))
     }
 
-    pub fn var(name: &'a Token) -> Stmt<'a> {
-        Stmt::Var(VarStmt::new(name, None))
+    pub fn var(name: &Token) -> Stmt {
+        Stmt::Var(VarStmt::new(name.clone(), None))
     }
 
-    pub fn var_init(name: &'a Token, initializer: Expr<'a>) -> Stmt<'a> {
-        Stmt::Var(VarStmt::new(name, Some(initializer)))
+    pub fn var_init(name: &Token, initializer: Expr) -> Stmt {
+        Stmt::Var(VarStmt::new(name.clone(), Some(initializer)))
     }
 
-    pub fn while_loop(condition: Expr<'a>, body: Stmt<'a>) -> Stmt<'a> {
+    pub fn while_loop(condition: Expr, body: Stmt) -> Stmt {
         Stmt::While(WhileStmt::new(condition, body))
     }
 }
 
 #[derive(Debug)]
-pub struct BlockStmt<'a> {
-    pub statements: Vec<Stmt<'a>>
+pub struct BlockStmt {
+    pub statements: Vec<Stmt>
 }
 
-impl<'a> BlockStmt<'a> {
-    fn new(statements: Vec<Stmt<'a>>) -> BlockStmt<'a> {
+impl BlockStmt {
+    fn new(statements: Vec<Stmt>) -> BlockStmt {
         BlockStmt { statements }
     }
 }
 
 #[derive(Debug)]
-pub struct ExprStmt<'a> {
-    pub expression: Expr<'a>
+pub struct ExprStmt {
+    pub expression: Expr
 }
 
-impl<'a> ExprStmt<'a> {
-    fn new(expression: Expr<'a>) -> ExprStmt<'a> {
+impl ExprStmt {
+    fn new(expression: Expr) -> ExprStmt {
         ExprStmt { expression }
     }
 }
 
 #[derive(Debug)]
-pub struct FunStmt<'a> {
-    pub name: &'a Token,
-    pub parameters: Vec<&'a Token>,
-    pub body: Box<Stmt<'a>>
+pub struct FunStmt {
+    pub name: Token,
+    pub parameters: Vec<Token>,
+    pub body: Box<Stmt>
 }
 
-impl<'a> FunStmt<'a> {
-    fn new(name: &'a Token, parameters: Vec<&'a Token>, body: Stmt<'a>) -> FunStmt<'a> {
+impl FunStmt {
+    fn new(name: Token, parameters: Vec<Token>, body: Stmt) -> FunStmt {
         FunStmt { name, parameters, body: Box::new(body) }
     }
 }
 
 #[derive(Debug)]
-pub struct IfStmt<'a> {
-    pub condition: Expr<'a>,
-    pub then_branch: Box<Stmt<'a>>,
-    pub else_branch: Option<Box<Stmt<'a>>>
+pub struct IfStmt {
+    pub condition: Expr,
+    pub then_branch: Box<Stmt>,
+    pub else_branch: Option<Box<Stmt>>
 }
 
-impl<'a> IfStmt<'a> {
-    fn new(condition: Expr<'a>, then_branch: Stmt<'a>, else_branch: Option<Box<Stmt<'a>>>) -> IfStmt<'a> {
+impl IfStmt {
+    fn new(condition: Expr, then_branch: Stmt, else_branch: Option<Box<Stmt>>) -> IfStmt {
         IfStmt { condition, then_branch: Box::new(then_branch), else_branch }
     }
 }
 
 #[derive(Debug)]
-pub struct PrintStmt<'a> {
-    pub expression: Expr<'a>
+pub struct PrintStmt {
+    pub expression: Expr
 }
 
-impl<'a> PrintStmt<'a> {
-    fn new(expression: Expr<'a>) -> PrintStmt<'a> {
+impl PrintStmt {
+    fn new(expression: Expr) -> PrintStmt {
         PrintStmt { expression }
     }
 }
 
 #[derive(Debug)]
-pub struct VarStmt<'a> {
-    pub name: &'a Token,
-    pub initializer: Option<Expr<'a>>
+pub struct VarStmt {
+    pub name: Token,
+    pub initializer: Option<Expr>
 }
 
-impl<'a> VarStmt<'a> {
-    fn new(name: &'a Token, initializer: Option<Expr<'a>>) -> VarStmt<'a> {
+impl VarStmt {
+    fn new(name: Token, initializer: Option<Expr>) -> VarStmt {
         VarStmt { name, initializer }
     }
 }
 
 #[derive(Debug)]
-pub struct WhileStmt<'a> {
-    pub condition: Expr<'a>,
-    pub body: Box<Stmt<'a>>
+pub struct WhileStmt {
+    pub condition: Expr,
+    pub body: Box<Stmt>
 }
 
-impl<'a> WhileStmt<'a> {
-    fn new(condition: Expr<'a>, body: Stmt<'a>) -> WhileStmt<'a> {
+impl WhileStmt {
+    fn new(condition: Expr, body: Stmt) -> WhileStmt {
         WhileStmt { condition, body: Box::new(body) }
     }
 }
 
 #[derive(Debug)]
-pub enum Expr<'a> {
-    Assign(AssignExpr<'a>),
-    Binary(BinaryExpr<'a>),
-    Call(CallExpr<'a>),
-    Grouping(GroupingExpr<'a>),
+pub enum Expr {
+    Assign(AssignExpr),
+    Binary(BinaryExpr),
+    Call(CallExpr),
+    Grouping(GroupingExpr),
     Literal(LiteralExpr),
-    Logical(LogicalExpr<'a>),
-    Unary(UnaryExpr<'a>),
-    Variable(VariableExpr<'a>)
+    Logical(LogicalExpr),
+    Unary(UnaryExpr),
+    Variable(VariableExpr)
 }
 
-impl<'a> fmt::Display for Expr<'a> {
+impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &Expr::Assign(ref assign_expr) => {
@@ -199,85 +199,85 @@ fn parenthesize_call(callee: &str, args: &Vec<Expr>) -> String {
 }
 
 
-impl<'a> Expr<'a> {
-    pub fn assign(name: &'a Token, value: Expr<'a>) -> Expr<'a> {
-        Expr::Assign(AssignExpr::new(name, value))
+impl Expr {
+    pub fn assign(name: &Token, value: Expr) -> Expr {
+        Expr::Assign(AssignExpr::new(name.clone(), value))
     }
 
-    pub fn binary(left: Expr<'a>, operator: &'a Token, right: Expr<'a>) -> Expr<'a> {
-        Expr::Binary(BinaryExpr::new(left, operator, right))
+    pub fn binary(left: Expr, operator: &Token, right: Expr) -> Expr {
+        Expr::Binary(BinaryExpr::new(left, operator.clone(), right))
     }
 
-    pub fn call(callee: Expr<'a>, paren: &'a Token, args: Vec<Expr<'a>>) -> Expr<'a> {
-        Expr::Call(CallExpr::new(callee, paren, args))
+    pub fn call(callee: Expr, paren: &Token, args: Vec<Expr>) -> Expr {
+        Expr::Call(CallExpr::new(callee, paren.clone(), args))
     }
 
     pub fn grouping(expr: Expr) -> Expr {
         Expr::Grouping(GroupingExpr::new(expr))
     }
 
-    pub fn literal(lit: Literal) -> Expr<'a> {
+    pub fn literal(lit: Literal) -> Expr {
         Expr::Literal(LiteralExpr::new(lit))
     }
 
-    pub fn logical(left: Expr<'a>, operator: &'a Token, right: Expr<'a>) -> Expr<'a> {
-        Expr::Logical(LogicalExpr::new(left, operator, right))
+    pub fn logical(left: Expr, operator: &Token, right: Expr) -> Expr {
+        Expr::Logical(LogicalExpr::new(left, operator.clone(), right))
     }
 
-    pub fn unary(operator: &'a Token, right: Expr<'a>) -> Expr<'a> {
-        Expr::Unary(UnaryExpr::new(operator, right))
+    pub fn unary(operator: &Token, right: Expr) -> Expr {
+        Expr::Unary(UnaryExpr::new(operator.clone(), right))
     }
 
-    pub fn variable(name: &'a Token) -> Expr<'a> {
-        Expr::Variable(VariableExpr::new(name))
+    pub fn variable(name: &Token) -> Expr {
+        Expr::Variable(VariableExpr::new(name.clone()))
     }
 }
 
 #[derive(Debug)]
-pub struct AssignExpr<'a> {
-    pub name: &'a Token,
-    pub value: Box<Expr<'a>>
+pub struct AssignExpr {
+    pub name: Token,
+    pub value: Box<Expr>
 }
 
-impl<'a> AssignExpr<'a> {
-    pub fn new(name: &'a Token, value: Expr<'a>) -> AssignExpr<'a> {
+impl AssignExpr {
+    pub fn new(name: Token, value: Expr) -> AssignExpr {
         AssignExpr { name, value: Box::new(value) }
     }
 }
 
 #[derive(Debug)]
-pub struct BinaryExpr<'a> {
-    pub left: Box<Expr<'a>>,
-    pub operator: &'a Token,
-    pub right: Box<Expr<'a>>
+pub struct BinaryExpr {
+    pub left: Box<Expr>,
+    pub operator: Token,
+    pub right: Box<Expr>
 }
 
-impl<'a> BinaryExpr<'a> {
-    fn new(left: Expr<'a>, operator: &'a Token, right: Expr<'a>) -> BinaryExpr<'a> {
+impl BinaryExpr {
+    fn new(left: Expr, operator: Token, right: Expr) -> BinaryExpr {
         BinaryExpr { left: Box::new(left), operator, right: Box::new(right) }
     }
 }
 
 #[derive(Debug)]
-pub struct CallExpr<'a> {
-    pub callee: Box<Expr<'a>>,
-    pub paren: &'a Token,
-    pub arguments: Vec<Expr<'a>>
+pub struct CallExpr {
+    pub callee: Box<Expr>,
+    pub paren: Token,
+    pub arguments: Vec<Expr>
 }
 
-impl<'a> CallExpr<'a> {
-    fn new(callee: Expr<'a>, paren: &'a Token, arguments: Vec<Expr<'a>>) -> CallExpr<'a> {
+impl CallExpr {
+    fn new(callee: Expr, paren: Token, arguments: Vec<Expr>) -> CallExpr {
         CallExpr { callee: Box::new(callee), paren, arguments }
     }
 }
 
 #[derive(Debug)]
-pub struct GroupingExpr<'a> {
-    pub expression: Box<Expr<'a>>
+pub struct GroupingExpr {
+    pub expression: Box<Expr>
 }
 
-impl<'a> GroupingExpr<'a> {
-    pub fn new(expression: Expr<'a>) -> GroupingExpr<'a> {
+impl GroupingExpr {
+    pub fn new(expression: Expr) -> GroupingExpr {
         GroupingExpr { expression: Box::new(expression) }
     }
 }
@@ -294,37 +294,37 @@ impl LiteralExpr {
 }
 
 #[derive(Debug)]
-pub struct LogicalExpr<'a> {
-    pub left: Box<Expr<'a>>,
-    pub operator: &'a Token,
-    pub right: Box<Expr<'a>>
+pub struct LogicalExpr {
+    pub left: Box<Expr>,
+    pub operator: Token,
+    pub right: Box<Expr>
 }
 
-impl<'a> LogicalExpr<'a> {
-    fn new(left: Expr<'a>, operator: &'a Token, right: Expr<'a>) -> LogicalExpr<'a> {
+impl LogicalExpr {
+    fn new(left: Expr, operator: Token, right: Expr) -> LogicalExpr {
         LogicalExpr { left: Box::new(left), operator, right: Box::new(right) }
     }
 }
 
 #[derive(Debug)]
-pub struct UnaryExpr<'a> {
-    pub operator: &'a Token,
-    pub right: Box<Expr<'a>>
+pub struct UnaryExpr {
+    pub operator: Token,
+    pub right: Box<Expr>
 }
 
-impl<'a> UnaryExpr<'a> {
-    fn new(operator: &'a Token, right: Expr<'a>) -> UnaryExpr<'a> {
+impl UnaryExpr {
+    fn new(operator: Token, right: Expr) -> UnaryExpr {
         UnaryExpr { operator, right: Box::new(right) }
     }
 }
 
 #[derive(Debug)]
-pub struct VariableExpr<'a> {
-    pub name: &'a Token
+pub struct VariableExpr {
+    pub name: Token
 }
 
-impl<'a> VariableExpr<'a> {
-    fn new(name: &'a Token) -> VariableExpr<'a> {
+impl VariableExpr {
+    fn new(name: Token) -> VariableExpr {
         VariableExpr { name }
     }
 }

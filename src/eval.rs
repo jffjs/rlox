@@ -4,7 +4,7 @@ use ast;
 use env::Environment;
 use token;
 
-impl<'a> ast::Stmt<'a> {
+impl ast::Stmt {
     pub fn execute(&self, env: &mut Environment) -> Result<(), RuntimeError> {
         match self {
             &ast::Stmt::Block(ref block_stmt) => {
@@ -145,11 +145,11 @@ impl Callable for Function {
 //     }
 // }
 
-impl<'a> ast::Expr<'a> {
+impl ast::Expr {
     pub fn evaluate(&self, env: &mut Environment) -> Result<Value, RuntimeError> {
         match self {
             &ast::Expr::Assign(ref assign_expr) => {
-                let name = assign_expr.name;
+                let name = &assign_expr.name;
                 let value = assign_expr.value.evaluate(env)?;
                 match env.assign(name.lexeme.clone(), value.clone()) {
                     Ok(_) => Ok(value),
@@ -159,8 +159,8 @@ impl<'a> ast::Expr<'a> {
             &ast::Expr::Binary(ref bin_expr) => {
                 let left = bin_expr.left.evaluate(env);
                 let right = bin_expr.right.evaluate(env);
-                let operator = bin_expr.operator;
-                eval_binary_expr(&operator, left?, right?)
+                let operator = &bin_expr.operator;
+                eval_binary_expr(operator, left?, right?)
             },
             &ast::Expr::Call(ref call_expr) => {
                 let callee = call_expr.callee.evaluate(env)?;
@@ -170,7 +170,7 @@ impl<'a> ast::Expr<'a> {
                 }
 
                 match callee {
-                    Value::Function(fun) => call(call_expr.paren, fun, env, arguments),
+                    Value::Function(fun) => call(&call_expr.paren, fun, env, arguments),
                     // Value::Class(class) => call(class, env, arguments),
                     _ => runtime_error(&call_expr.paren, "Can only call functions and classes.")
                 }
@@ -205,7 +205,7 @@ impl<'a> ast::Expr<'a> {
             }
             &ast::Expr::Unary(ref unary_expr) => {
                 let right = unary_expr.right.evaluate(env)?;
-                let operator = unary_expr.operator;
+                let operator = &unary_expr.operator;
                 match operator.token_type {
                     token::TokenType::Minus => match right {
                         Value::Number(n) => Ok(Value::Number(-n)),
