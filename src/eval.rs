@@ -63,7 +63,7 @@ impl ast::Stmt {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Nil,
     Boolean(bool),
@@ -87,16 +87,6 @@ impl fmt::Display for Value {
 }
 
 impl Value {
-    fn clone(&self) -> Value {
-        match self {
-            &Value::Nil => Value::Nil,
-            &Value::Boolean(b) => Value::Boolean(b),
-            &Value::Function(ref fun) => Value::Function(Function {}), // TODO: implement
-            &Value::Number(n) => Value::Number(n),
-            &Value::String(ref s) => Value::String(s.clone())
-        }
-    }
-
     pub fn print(&self) -> String {
         match self {
             &Value::Nil => format!("nil"),
@@ -120,9 +110,9 @@ fn call<T: Callable>(paren: &token::Token, callee: T, env: &mut Environment, arg
     callee.call(env, args)
 }
 
-
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Function {
+    pub declaration: ast::FunStmt
 }
 
 impl Callable for Function {
