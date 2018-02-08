@@ -50,6 +50,13 @@ impl ast::Stmt {
                 println!("{}", expr_result.print());
                 Ok(None)
             },
+            &ast::Stmt::Return(ref ret_stmt) => {
+                let value = match &ret_stmt.value {
+                    &Some(ref expr) => expr.evaluate(env)?,
+                    &None => Value::Nil
+                };
+                Ok(Some(value))
+            },
             &ast::Stmt::Var(ref var_stmt) => {
                 let value;
                 match var_stmt.initializer {
@@ -145,7 +152,8 @@ impl Callable for LoxFunction {
         }
 
         let result = match self.declaration.body.execute(env) {
-            Ok(_) => Ok(Value::Nil),
+            Ok(Some(v)) => Ok(v),
+            Ok(None) => Ok(Value::Nil),
             Err(err) => Err(err)
         };
         env.pop_scope();

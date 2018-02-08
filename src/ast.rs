@@ -8,6 +8,7 @@ pub enum Stmt {
     Fun(FunStmt),
     If(IfStmt),
     Print(PrintStmt),
+    Return(ReturnStmt),
     Var(VarStmt),
     While(WhileStmt)
 }
@@ -35,6 +36,10 @@ impl Stmt {
 
     pub fn print(expression: Expr) -> Stmt {
         Stmt::Print(PrintStmt::new(expression))
+    }
+
+    pub fn ret(keyword: &Token, value: Option<Expr>) -> Stmt {
+        Stmt::Return(ReturnStmt::new(keyword.clone(), value))
     }
 
     pub fn var(name: &Token) -> Stmt {
@@ -106,6 +111,18 @@ pub struct PrintStmt {
 impl PrintStmt {
     fn new(expression: Expr) -> PrintStmt {
         PrintStmt { expression }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ReturnStmt {
+    pub keyword: Token,
+    pub value: Option<Expr>
+}
+
+impl ReturnStmt {
+    fn new(keyword: Token, value: Option<Expr>) -> ReturnStmt {
+        ReturnStmt { keyword, value }
     }
 }
 

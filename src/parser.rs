@@ -152,6 +152,7 @@ fn statement(tokens: &Vec<Token>, pos: usize) -> StmtResult {
         TokenType::For => for_statement(tokens, pos + 1),
         TokenType::LeftBrace => block_statement(tokens, pos +1),
         TokenType::Print => print_statement(tokens, pos + 1),
+        TokenType::Return => return_statement(tokens, pos + 1),
         TokenType::While => while_statement(tokens, pos + 1),
         _ => expression_statement(tokens, pos)
     }
@@ -301,6 +302,26 @@ fn print_statement(tokens: &Vec<Token>, pos: usize) -> StmtResult {
             }
         },
         ExprResult::Err(err, pos) => StmtResult::Err(err, pos)
+    }
+}
+
+fn return_statement(tokens: &Vec<Token>, mut pos: usize) -> StmtResult {
+    let keyword = &tokens[pos - 1];
+
+    let mut value = None;
+    if !check_token(&tokens[pos], TokenType::Semicolon) {
+        match expression(tokens, pos) {
+            ExprResult::Ok(expr, next_pos) => {
+                pos = next_pos;
+                value = Some(expr);
+            },
+            ExprResult::Err(msg, pos) => return StmtResult::Err(msg, pos)
+        }
+    }
+
+    match tokens[pos].token_type {
+        TokenType::Semicolon => StmtResult::Ok(ast::Stmt::ret(keyword, value), pos + 1),
+        _ => StmtResult::Err("Expect ';' after return value.", pos)
     }
 }
 
