@@ -1,9 +1,7 @@
 use std::collections::HashMap;
-use std::rc::Rc;
-use std::cell::RefCell;
-use eval::Value;
+use eval::RefValue;
 
-type Scope = HashMap<String, Rc<RefCell<Value>>>;
+type Scope = HashMap<String, RefValue>;
 
 #[derive(Clone, Debug)]
 pub struct Environment {
@@ -28,9 +26,9 @@ impl Environment {
         }
     }
 
-    pub fn assign(&mut self, name: String, val: Value) -> Result<(), String> {
+    pub fn assign(&mut self, name: String, value: RefValue) -> Result<(), String> {
         let mut scope = self.current_scope;
-        let value = Rc::new(RefCell::new(val));
+        // let value = Rc::new(value_ref(val));
 
         while scope != 0 {
             if self.scopes[scope].contains_key(&name) {
@@ -50,12 +48,12 @@ impl Environment {
         }
     }
 
-    pub fn define(&mut self, name: String, val: Value) {
-        let value = Rc::new(RefCell::new(val));
+    pub fn define(&mut self, name: String, value: RefValue) {
+        // let value = Rc::new(value_ref(val));
         self.scopes[self.current_scope].insert(name, value);
     }
 
-    pub fn get(&self, name: &String) -> Option<Rc<RefCell<Value>>> {
+    pub fn get(&self, name: &String) -> Option<RefValue> {
         let mut scope = self.current_scope;
         while scope != 0 {
             match self.get_in_scope(name, scope) {
@@ -66,7 +64,7 @@ impl Environment {
         self.get_in_scope(name, scope)
     }
 
-    fn get_in_scope(&self, name: &String, scope: usize) -> Option<Rc<RefCell<Value>>> {
+    fn get_in_scope(&self, name: &String, scope: usize) -> Option<RefValue> {
         match self.scopes[scope].get(name) {
             Some(v) => Some(v.clone()),
             None => None
@@ -76,38 +74,37 @@ impl Environment {
 
 #[cfg(test)]
 mod env_tests {
-    use std::cell::RefCell;
     use env::Environment;
-    use eval::Value;
+    use eval::{Value, value_ref};
 
     #[test]
     fn define_and_get() {
         let mut env = Environment::new();
         let key = String::from("foo");
-        env.define(key.clone(), Value::Number(4.0));
+        env.define(key.clone(), value_ref(Value::Number(4.0)));
 
-        let expect = RefCell::new(Value::Number(4.0));
+        let expect = value_ref(Value::Number(4.0));
         let actual = env.get(&key).unwrap();
-        assert_eq!(*expect.borrow(), *actual.borrow());
+        assert_eq!(expect, actual);
     }
 
     #[test]
     fn assign_success() {
         let mut env = Environment::new();
         let key = String::from("foo");
-        env.define(key.clone(), Value::Number(4.0));
-        let _result = env.assign(key.clone(), Value::Boolean(true));
+        env.define(key.clone(), value_ref(Value::Number(4.0)));
+        let _result = env.assign(key.clone(), value_ref(Value::Boolean(true)));
 
-        let expect = RefCell::new(Value::Boolean(true));
+        let expect = value_ref(Value::Boolean(true));
         let actual = env.get(&key).unwrap();
-        assert_eq!(*expect.borrow(), *actual.borrow());
+        assert_eq!(expect, actual);
     }
 
     #[test]
     fn assign_fail() {
         let mut env = Environment::new();
         let key = String::from("foo");
-        let err = env.assign(key.clone(), Value::Boolean(true)).unwrap_err();
+        let err = env.assign(key.clone(), value_ref(Value::Boolean(true))).unwrap_err();
 
         assert_eq!("Undefined variable 'foo'.", err);
     }
@@ -116,15 +113,15 @@ mod env_tests {
     fn get_from_parent_scope() {
         let mut env = Environment::new();
         let key = String::from("foo");
-        env.define(key.clone(), Value::Number(4.0));
+        env.define(key.clone(), value_ref(Value::Number(4.0)));
         env.push_scope();
 
-        env.define(key.clone(), Value::Number(5.0));
+        env.define(key.clone(), value_ref(Value::Number(5.0)));
         env.push_scope();
 
-        let expect = RefCell::new(Value::Number(5.0));
+        let expect = value_ref(Value::Number(5.0));
         let actual = env.get(&key).unwrap();
-        assert_eq!(*expect.borrow(), *actual.borrow());
+        assert_eq!(expect, actual);
     }
 
 
@@ -132,40 +129,40 @@ mod env_tests {
     fn assign_to_parent() {
         let mut env = Environment::new();
         let key = String::from("foo");
-        env.define(key.clone(), Value::Number(4.0));
+        env.define(key.clone(), value_ref(Value::Number(4.0)));
 
-        let mut expect = RefCell::new(Value::Number(4.0));
+        let mut expect = value_ref(Value::Number(4.0));
         let mut actual = env.get(&key).unwrap();
-        assert_eq!(*expect.borrow(), *actual.borrow());
+        assert_eq!(expect, actual);
 
         env.push_scope();
         env.push_scope();
-        let _result = env.assign(key.clone(), Value::Number(5.0));
+        let _result = env.assign(key.clone(), value_ref(Value::Number(5.0)));
 
-        expect = RefCell::new(Value::Number(5.0));
+        expect = value_ref(Value::Number(5.0));
         actual = env.get(&key).unwrap();
-        assert_eq!(*expect.borrow(), *actual.borrow());
+        assert_eq!(expect, actual);
     }
 
     #[test]
     fn shadow_var() {
         let mut env = Environment::new();
         let key = String::from("foo");
-        env.define(key.clone(), Value::Number(4.0));
-        let mut expect = RefCell::new(Value::Number(4.0));
+        env.define(key.clone(), value_ref(Value::Number(4.0)));
+        let mut expect = value_ref(Value::Number(4.0));
         let mut actual = env.get(&key).unwrap();
-        assert_eq!(*expect.borrow(), *actual.borrow());
+        assert_eq!(expect, actual);
 
         env.push_scope();
-        env.define(key.clone(), Value::Number(5.0));
+        env.define(key.clone(), value_ref(Value::Number(5.0)));
 
-        expect = RefCell::new(Value::Number(5.0));
+        expect = value_ref(Value::Number(5.0));
         actual = env.get(&key).unwrap();
-        assert_eq!(*expect.borrow(), *actual.borrow());
+        assert_eq!(expect, actual);
 
         env.pop_scope();
-        expect = RefCell::new(Value::Number(4.0));
+        expect = value_ref(Value::Number(4.0));
         actual = env.get(&key).unwrap();
-        assert_eq!(*expect.borrow(), *actual.borrow());
+        assert_eq!(expect, actual);
     }
 }

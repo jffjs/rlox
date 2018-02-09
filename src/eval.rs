@@ -1,11 +1,14 @@
 use std::error::Error;
 use std::fmt;
+use std::rc::Rc;
+use std::cell::RefCell;
+
 use ast;
 use env::Environment;
 use token;
 
 impl ast::Stmt {
-    pub fn execute(&self, env: &mut Environment) -> Result<Option<Value>, RuntimeError> {
+    pub fn execute(&self, env: &mut Environment) -> Result<Option<RefValue>, RuntimeError> {
         match self {
             &ast::Stmt::Block(ref block_stmt) => {
                 env.push_scope();
@@ -30,15 +33,16 @@ impl ast::Stmt {
                 Ok(None)
             },
             &ast::Stmt::Fun(ref fun_stmt) => {
+                // this is breaking recursion... function's environment is created before function is defined
+                // need to pass in env when calling function and combine it with closure
                 let closure = env.clone();
                 let fun = LoxFunction::new(fun_stmt.clone(), closure);
-                println!("{:?}", fun.closure);
-                env.define(fun.declaration.name.lexeme.clone(), Value::Function(fun));
+                env.define(fun.declaration.name.lexeme.clone(), value_ref(Value::Function(fun)));
                 Ok(None)
             }
             &ast::Stmt::If(ref if_stmt) => {
                 let condition = if_stmt.condition.evaluate(env)?;
-                if is_truthy(&condition) {
+                if is_truthy(condition) {
                     Ok(if_stmt.then_branch.execute(env)?)
                 } else {
                     match if_stmt.else_branch {
@@ -49,13 +53,13 @@ impl ast::Stmt {
             },
             &ast::Stmt::Print(ref print_stmt) => {
                 let expr_result = print_stmt.expression.evaluate(env)?;
-                println!("{}", expr_result.print());
+                println!("{}", expr_result.borrow().print());
                 Ok(None)
             },
             &ast::Stmt::Return(ref ret_stmt) => {
                 let value = match &ret_stmt.value {
                     &Some(ref expr) => expr.evaluate(env)?,
-                    &None => Value::Nil
+                    &None => value_ref(Value::Nil)
                 };
                 Ok(Some(value))
             },
@@ -63,14 +67,14 @@ impl ast::Stmt {
                 let value;
                 match var_stmt.initializer {
                     Some(ref initializer) => value = initializer.evaluate(env)?,
-                    None => value = Value::Nil
+                    None => value = value_ref(Value::Nil)
                 }
                 env.define(var_stmt.name.lexeme.clone(), value);
                 Ok(None)
             },
             &ast::Stmt::While(ref while_stmt) => {
                 let mut condition = while_stmt.condition.evaluate(env)?;
-                while is_truthy(&condition) {
+                while is_truthy(condition) {
                     match while_stmt.body.execute(env) {
                         Ok(None) => (),
                         Ok(Some(v)) => return Ok(Some(v)),
@@ -83,6 +87,13 @@ impl ast::Stmt {
         }
     }
 }
+
+pub type RefValue = Rc<RefCell<Value>>;
+
+pub fn value_ref(v: Value) -> RefValue {
+    Rc::new(RefCell::new(v))
+}
+
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -121,10 +132,11 @@ impl Value {
 
 trait Callable {
     fn arity(&self) -> usize;
-    fn call(&mut self, args: Vec<Value>) -> Result<Value, RuntimeError>;
+    fn call(&mut self, args: Vec<RefValue>) -> Result<RefValue, RuntimeError>;
 }
 
-fn call<T: Callable>(paren: &token::Token, mut callee: T, args: Vec<Value>) -> Result<Value, RuntimeError> {
+
+fn call<T: Callable>(paren: &token::Token, callee: &mut T, args: Vec<RefValue>) -> Result<RefValue, RuntimeError> {
     if callee.arity() != args.len() {
         return runtime_error(paren, &format!("Expected {} arguments but got {}.", callee.arity(), args.len()))
     }
@@ -148,7 +160,7 @@ impl Callable for LoxFunction {
         self.declaration.parameters.len()
     }
 
-    fn call(&mut self, args: Vec<Value>) -> Result<Value, RuntimeError> {
+    fn call(&mut self, args: Vec<RefValue>) -> Result<RefValue, RuntimeError> {
         // Try using Rc<RefCell<Value>> in scope hashmaps instead of cloning
         // Maybe keep track of closures separately in Environment?
         let env = &mut self.closure;
@@ -159,7 +171,7 @@ impl Callable for LoxFunction {
 
         let result = match self.declaration.body.execute(env) {
             Ok(Some(v)) => Ok(v),
-            Ok(None) => Ok(Value::Nil),
+            Ok(None) => Ok(value_ref(Value::Nil)),
             Err(err) => Err(err)
         };
         // env.pop_scope();
@@ -190,7 +202,7 @@ impl PartialEq for LoxFunction {
 // }
 
 impl ast::Expr {
-    pub fn evaluate(&self, env: &mut Environment) -> Result<Value, RuntimeError> {
+    pub fn evaluate(&self, env: &mut Environment) -> Result<RefValue, RuntimeError> {
         match self {
             &ast::Expr::Assign(ref assign_expr) => {
                 let name = &assign_expr.name;
@@ -213,32 +225,32 @@ impl ast::Expr {
                     arguments.push(arg.evaluate(env)?);
                 }
 
-                match callee {
-                    Value::Function(fun) => call(&call_expr.paren, fun, arguments),
+                match *callee.borrow_mut() {
+                    Value::Function(ref mut fun) => return call(&call_expr.paren, fun, arguments),
                     // Value::Class(class) => call(class, env, arguments),
-                    _ => runtime_error(&call_expr.paren, "Can only call functions and classes.")
-                }
+                    _ => return runtime_error(&call_expr.paren, "Can only call functions and classes.")
+                };
             },
             &ast::Expr::Grouping(ref group_expr) => group_expr.expression.evaluate(env),
             &ast::Expr::Literal(ref lit_expr) => match &lit_expr.value {
-                &token::Literal::Nil => Ok(Value::Nil),
-                &token::Literal::True => Ok(Value::Boolean(true)),
-                &token::Literal::False => Ok(Value::Boolean(false)),
-                &token::Literal::Number(n) => Ok(Value::Number(n)),
-                &token::Literal::String(ref s) => Ok(Value::String(s.clone()))
+                &token::Literal::Nil => Ok(value_ref(Value::Nil)),
+                &token::Literal::True => Ok(value_ref(Value::Boolean(true))),
+                &token::Literal::False => Ok(value_ref(Value::Boolean(false))),
+                &token::Literal::Number(n) => Ok(value_ref(Value::Number(n))),
+                &token::Literal::String(ref s) => Ok(value_ref(Value::String(s.clone())))
             },
             &ast::Expr::Logical(ref logical_expr) => {
                 let left = logical_expr.left.evaluate(env)?;
                 match logical_expr.operator.token_type {
                     token::TokenType::Or => {
-                        if is_truthy(&left) {
+                        if is_truthy(left.clone()) {
                             Ok(left)
                         } else {
                             logical_expr.right.evaluate(env)
                         }
                     },
                     token::TokenType::And => {
-                        if !is_truthy(&left) {
+                        if !is_truthy(left.clone()) {
                             Ok(left)
                         } else {
                             logical_expr.right.evaluate(env)
@@ -251,18 +263,18 @@ impl ast::Expr {
                 let right = unary_expr.right.evaluate(env)?;
                 let operator = &unary_expr.operator;
                 match operator.token_type {
-                    token::TokenType::Minus => match right {
-                        Value::Number(n) => Ok(Value::Number(-n)),
+                    token::TokenType::Minus => match *right.borrow() {
+                        Value::Number(n) => Ok(value_ref(Value::Number(-n))),
                         _ => runtime_error(&operator, "Operand must be a number.")
                     },
-                    token::TokenType::Bang => Ok(Value::Boolean(!is_truthy(&right))),
+                    token::TokenType::Bang => Ok(value_ref(Value::Boolean(!is_truthy(right)))),
                     _ => panic!("Invalid unary expression. This is an uncaught parse error.")
                 }
             },
             &ast::Expr::Variable(ref var_expr) => {
                 let name = &var_expr.name;
                 match env.get(&name.lexeme) {
-                    Some(val) => Ok(Value::Nil /*val.clone()*/), // TODO: this is breaking closures
+                    Some(val) => Ok(val.clone()), // TODO: this is breaking closures
                     None => runtime_error(name, &format!("Undefined variable '{}'", name.lexeme))
                 }
             },
@@ -271,63 +283,63 @@ impl ast::Expr {
     }
 }
 
-fn is_truthy(val: &Value) -> bool {
-    match val {
-        &Value::Nil => false,
-        &Value::Boolean(b) => b,
+fn is_truthy(val: RefValue) -> bool {
+    match *val.borrow() {
+        Value::Nil => false,
+        Value::Boolean(b) => b,
         _ => true
     }
 }
 
-fn is_equal(a: Value, b: Value) -> bool {
-    match a {
-        Value::Boolean(a_bool) => match b {
-            Value::Boolean(b_bool) => a_bool == b_bool,
+fn is_equal(a: RefValue, b: RefValue) -> bool {
+    match *a.borrow() {
+        Value::Boolean(ref a_bool) => match *b.borrow() {
+            Value::Boolean(ref b_bool) => a_bool == b_bool,
             _ => false
         },
-        Value::Function(a_fun) => match b {
-            Value::Function(b_fun) => &a_fun == &b_fun,
+        Value::Function(ref a_fun) => match *b.borrow() {
+            Value::Function(ref b_fun) => &a_fun == &b_fun,
             _ => false
         },
-        Value::Nil => match b {
+        Value::Nil => match *b.borrow() {
             Value::Nil => true,
             _ => false
         }
-        Value::Number(a_num) => match b {
+        Value::Number(a_num) => match *b.borrow() {
             Value::Number(b_num) => a_num == b_num,
             _ => false
         },
-        Value::String(a_str) => match b {
-            Value::String(b_str) => a_str.eq(&b_str),
+        Value::String(ref a_str) => match *b.borrow() {
+            Value::String(ref b_str) => a_str.eq(b_str),
             _ => false
         }
     }
 }
 
 fn eval_binary_expr<'a>(operator: &token::Token,
-                        left: Value,
-                        right: Value) -> Result<Value, RuntimeError> {
+                        left: RefValue,
+                        right: RefValue) -> Result<RefValue, RuntimeError> {
     match operator.token_type {
-        token::TokenType::EqualEqual => Ok(Value::Boolean(is_equal(left, right))),
-        token::TokenType::BangEqual => Ok(Value::Boolean(!is_equal(left, right))),
-        _ => match left {
-            Value::Number(l_num) => match right {
-                Value::Number(r_num) => match operator.token_type {
-                    token::TokenType::Plus => Ok(Value::Number(l_num + r_num)),
-                    token::TokenType::Minus => Ok(Value::Number(l_num - r_num)),
-                    token::TokenType::Star => Ok(Value::Number(l_num * r_num)),
-                    token::TokenType::Slash => Ok(Value::Number(l_num / r_num)),
-                    token::TokenType::Greater => Ok(Value::Boolean(l_num > r_num)),
-                    token::TokenType::GreaterEqual => Ok(Value::Boolean(l_num >= r_num)),
-                    token::TokenType::Less => Ok(Value::Boolean(l_num < r_num)),
-                    token::TokenType::LessEqual => Ok(Value::Boolean(l_num <= r_num)),
+        token::TokenType::EqualEqual => Ok(value_ref(Value::Boolean(is_equal(left, right)))),
+        token::TokenType::BangEqual => Ok(value_ref(Value::Boolean(!is_equal(left, right)))),
+        _ => match *left.borrow() {
+            Value::Number(ref l_num) => match *right.borrow() {
+                Value::Number(ref r_num) => match operator.token_type {
+                    token::TokenType::Plus => Ok(value_ref(Value::Number(l_num + r_num))),
+                    token::TokenType::Minus => Ok(value_ref(Value::Number(l_num - r_num))),
+                    token::TokenType::Star => Ok(value_ref(Value::Number(l_num * r_num))),
+                    token::TokenType::Slash => Ok(value_ref(Value::Number(l_num / r_num))),
+                    token::TokenType::Greater => Ok(value_ref(Value::Boolean(l_num > r_num))),
+                    token::TokenType::GreaterEqual => Ok(value_ref(Value::Boolean(l_num >= r_num))),
+                    token::TokenType::Less => Ok(value_ref(Value::Boolean(l_num < r_num))),
+                    token::TokenType::LessEqual => Ok(value_ref(Value::Boolean(l_num <= r_num))),
                     _ => panic!("Invalid binary expression. This is an uncaught parse error")
                 },
                 _ => runtime_error(operator, "Right operand must be a Number.")
             },
-            Value::String(l_str) => match right {
-                Value::String(r_str) => match operator.token_type {
-                    token::TokenType::Plus => Ok(Value::String(format!("{}{}", l_str, r_str))),
+            Value::String(ref l_str) => match *right.borrow() {
+                Value::String(ref r_str) => match operator.token_type {
+                    token::TokenType::Plus => Ok(value_ref(Value::String(format!("{}{}", l_str, r_str)))),
                     _ => panic!("Invalid binary expression. This is an uncaught parse error")
                 },
                 _ => runtime_error(operator, "Right operand must be a String.")
@@ -366,6 +378,6 @@ impl Error for RuntimeError {
     }
 }
 
-fn runtime_error(token: &token::Token, msg: &str) -> Result<Value, RuntimeError> {
+fn runtime_error(token: &token::Token, msg: &str) -> Result<RefValue, RuntimeError> {
     Result::Err(RuntimeError::new(token.line, String::from(msg)))
 }
