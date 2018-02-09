@@ -7,17 +7,19 @@ mod env;
 
 use std::error::Error;
 use std::fmt;
+use std::rc::Rc;
+use std::cell::RefCell;
 use env::Environment;
 use parser::parse;
 use scanner::Scanner;
 
 pub struct Interpreter {
-    env: Environment
+    env: Rc<RefCell<Environment>>
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
-        Interpreter { env: Environment::new() }
+        Interpreter { env: Rc::new(RefCell::new(Environment::new())) }
     }
 
     pub fn run(&mut self, source: String) -> Result<(), LoxError> {
@@ -33,7 +35,7 @@ impl Interpreter {
                 match parse(&tokens) {
                     Ok(statements) => {
                         for statement in statements {
-                            match statement.execute(&mut self.env) {
+                            match statement.execute(self.env.clone()) {
                                 Ok(_) => (),
                                 Err(error) => errors.push(Box::new(error))
                             }

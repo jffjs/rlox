@@ -8,24 +8,24 @@ use env::Environment;
 use token;
 
 impl ast::Stmt {
-    pub fn execute(&self, env: &mut Environment) -> Result<Option<RefValue>, RuntimeError> {
+    pub fn execute(&self, env: Rc<RefCell<Environment>>) -> Result<Option<RefValue>, RuntimeError> {
         match self {
             &ast::Stmt::Block(ref block_stmt) => {
-                env.push_scope();
+                env.borrow_mut().push_scope();
                 for statement in &block_stmt.statements {
-                    match statement.execute(env) {
+                    match statement.execute(env.clone()) {
                         Ok(None) => (),
                         Ok(Some(v)) => {
-                            env.pop_scope();
+                            env.borrow_mut().pop_scope();
                             return Ok(Some(v));
                         }
                         Err(err) => {
-                            env.pop_scope();
+                            env.borrow_mut().pop_scope();
                             return Err(err);
                         }
                     }
                 }
-                env.pop_scope();
+                env.borrow_mut().pop_scope();
                 Ok(None)
             },
             &ast::Stmt::Expr(ref expr_stmt) => {
@@ -37,16 +37,16 @@ impl ast::Stmt {
                 // need to pass in env when calling function and combine it with closure
                 let closure = env.clone();
                 let fun = LoxFunction::new(fun_stmt.clone(), closure);
-                env.define(fun.declaration.name.lexeme.clone(), value_ref(Value::Function(fun)));
+                env.borrow_mut().define(fun.declaration.name.lexeme.clone(), value_ref(Value::Function(fun)));
                 Ok(None)
             }
             &ast::Stmt::If(ref if_stmt) => {
-                let condition = if_stmt.condition.evaluate(env)?;
+                let condition = if_stmt.condition.evaluate(env.clone())?;
                 if is_truthy(condition) {
-                    Ok(if_stmt.then_branch.execute(env)?)
+                    Ok(if_stmt.then_branch.execute(env.clone())?)
                 } else {
                     match if_stmt.else_branch {
-                        Some(ref else_branch) => Ok(else_branch.execute(env)?),
+                        Some(ref else_branch) => Ok(else_branch.execute(env.clone())?),
                         None => Ok(None)
                     }
                 }
@@ -66,21 +66,21 @@ impl ast::Stmt {
             &ast::Stmt::Var(ref var_stmt) => {
                 let value;
                 match var_stmt.initializer {
-                    Some(ref initializer) => value = initializer.evaluate(env)?,
+                    Some(ref initializer) => value = initializer.evaluate(env.clone())?,
                     None => value = value_ref(Value::Nil)
                 }
-                env.define(var_stmt.name.lexeme.clone(), value);
+                env.borrow_mut().define(var_stmt.name.lexeme.clone(), value);
                 Ok(None)
             },
             &ast::Stmt::While(ref while_stmt) => {
-                let mut condition = while_stmt.condition.evaluate(env)?;
+                let mut condition = while_stmt.condition.evaluate(env.clone())?;
                 while is_truthy(condition) {
-                    match while_stmt.body.execute(env) {
+                    match while_stmt.body.execute(env.clone()) {
                         Ok(None) => (),
                         Ok(Some(v)) => return Ok(Some(v)),
                         Err(err) => return Err(err)
                     }
-                    condition = while_stmt.condition.evaluate(env)?;
+                    condition = while_stmt.condition.evaluate(env.clone())?;
                 }
                 Ok(None)
             }
@@ -146,11 +146,11 @@ fn call<T: Callable>(paren: &token::Token, callee: &mut T, args: Vec<RefValue>) 
 #[derive(Clone, Debug)]
 pub struct LoxFunction {
     pub declaration: ast::FunStmt,
-    pub closure: Environment
+    pub closure: Rc<RefCell<Environment>>
 }
 
 impl LoxFunction {
-    pub fn new(declaration: ast::FunStmt, closure: Environment) -> LoxFunction {
+    pub fn new(declaration: ast::FunStmt, closure: Rc<RefCell<Environment>>) -> LoxFunction {
         LoxFunction { declaration, closure }
     }
 }
@@ -161,15 +161,13 @@ impl Callable for LoxFunction {
     }
 
     fn call(&mut self, args: Vec<RefValue>) -> Result<RefValue, RuntimeError> {
-        // Try using Rc<RefCell<Value>> in scope hashmaps instead of cloning
-        // Maybe keep track of closures separately in Environment?
         let env = &mut self.closure;
         // env.push_scope();
         for (i, param) in self.declaration.parameters.iter().enumerate() {
-            env.define(param.lexeme.clone(), args[i].clone());
+            env.borrow_mut().define(param.lexeme.clone(), args[i].clone());
         }
 
-        let result = match self.declaration.body.execute(env) {
+        let result = match self.declaration.body.execute(env.clone()) {
             Ok(Some(v)) => Ok(v),
             Ok(None) => Ok(value_ref(Value::Nil)),
             Err(err) => Err(err)
@@ -202,27 +200,27 @@ impl PartialEq for LoxFunction {
 // }
 
 impl ast::Expr {
-    pub fn evaluate(&self, env: &mut Environment) -> Result<RefValue, RuntimeError> {
+    pub fn evaluate(&self, env: Rc<RefCell<Environment>>) -> Result<RefValue, RuntimeError> {
         match self {
             &ast::Expr::Assign(ref assign_expr) => {
                 let name = &assign_expr.name;
-                let value = assign_expr.value.evaluate(env)?;
-                match env.assign(name.lexeme.clone(), value.clone()) {
+                let value = assign_expr.value.evaluate(env.clone())?;
+                match env.borrow_mut().assign(name.lexeme.clone(), value.clone()) {
                     Ok(_) => Ok(value),
                     Err(msg) => runtime_error(name, &msg)
                 }
             },
             &ast::Expr::Binary(ref bin_expr) => {
-                let left = bin_expr.left.evaluate(env);
-                let right = bin_expr.right.evaluate(env);
+                let left = bin_expr.left.evaluate(env.clone());
+                let right = bin_expr.right.evaluate(env.clone());
                 let operator = &bin_expr.operator;
                 eval_binary_expr(operator, left?, right?)
             },
             &ast::Expr::Call(ref call_expr) => {
-                let callee = call_expr.callee.evaluate(env)?;
+                let callee = call_expr.callee.evaluate(env.clone())?;
                 let mut arguments = vec![];
                 for arg in &call_expr.arguments {
-                    arguments.push(arg.evaluate(env)?);
+                    arguments.push(arg.evaluate(env.clone())?);
                 }
 
                 match *callee.borrow_mut() {
@@ -240,13 +238,13 @@ impl ast::Expr {
                 &token::Literal::String(ref s) => Ok(value_ref(Value::String(s.clone())))
             },
             &ast::Expr::Logical(ref logical_expr) => {
-                let left = logical_expr.left.evaluate(env)?;
+                let left = logical_expr.left.evaluate(env.clone())?;
                 match logical_expr.operator.token_type {
                     token::TokenType::Or => {
                         if is_truthy(left.clone()) {
                             Ok(left)
                         } else {
-                            logical_expr.right.evaluate(env)
+                            logical_expr.right.evaluate(env.clone())
                         }
                     },
                     token::TokenType::And => {
@@ -260,7 +258,7 @@ impl ast::Expr {
                 }
             }
             &ast::Expr::Unary(ref unary_expr) => {
-                let right = unary_expr.right.evaluate(env)?;
+                let right = unary_expr.right.evaluate(env.clone())?;
                 let operator = &unary_expr.operator;
                 match operator.token_type {
                     token::TokenType::Minus => match *right.borrow() {
@@ -273,7 +271,7 @@ impl ast::Expr {
             },
             &ast::Expr::Variable(ref var_expr) => {
                 let name = &var_expr.name;
-                match env.get(&name.lexeme) {
+                match env.borrow().get(&name.lexeme) {
                     Some(val) => Ok(val.clone()), // TODO: this is breaking closures
                     None => runtime_error(name, &format!("Undefined variable '{}'", name.lexeme))
                 }
