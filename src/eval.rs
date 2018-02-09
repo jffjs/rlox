@@ -30,7 +30,9 @@ impl ast::Stmt {
                 Ok(None)
             },
             &ast::Stmt::Fun(ref fun_stmt) => {
-                let fun = LoxFunction::new(fun_stmt.clone());
+                let closure = env.clone();
+                let fun = LoxFunction::new(fun_stmt.clone(), closure);
+                println!("{:?}", fun.closure);
                 env.define(fun.declaration.name.lexeme.clone(), Value::Function(fun));
                 Ok(None)
             }
@@ -119,24 +121,25 @@ impl Value {
 
 trait Callable {
     fn arity(&self) -> usize;
-    fn call(&self, env: &mut Environment, args: Vec<Value>) -> Result<Value, RuntimeError>;
+    fn call(&mut self, args: Vec<Value>) -> Result<Value, RuntimeError>;
 }
 
-fn call<T: Callable>(paren: &token::Token, callee: T, env: &mut Environment, args: Vec<Value>) -> Result<Value, RuntimeError> {
+fn call<T: Callable>(paren: &token::Token, mut callee: T, args: Vec<Value>) -> Result<Value, RuntimeError> {
     if callee.arity() != args.len() {
         return runtime_error(paren, &format!("Expected {} arguments but got {}.", callee.arity(), args.len()))
     }
-    callee.call(env, args)
+    callee.call(args)
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct LoxFunction {
-    pub declaration: ast::FunStmt
+    pub declaration: ast::FunStmt,
+    pub closure: Environment
 }
 
 impl LoxFunction {
-    pub fn new(declaration: ast::FunStmt) -> LoxFunction {
-        LoxFunction { declaration }
+    pub fn new(declaration: ast::FunStmt, closure: Environment) -> LoxFunction {
+        LoxFunction { declaration, closure }
     }
 }
 
@@ -145,8 +148,11 @@ impl Callable for LoxFunction {
         self.declaration.parameters.len()
     }
 
-    fn call(&self, env: &mut Environment, args: Vec<Value>) -> Result<Value, RuntimeError> {
-        env.push_scope();
+    fn call(&mut self, args: Vec<Value>) -> Result<Value, RuntimeError> {
+        // Try using Rc<RefCell<Value>> in scope hashmaps instead of cloning
+        // Maybe keep track of closures separately in Environment?
+        let env = &mut self.closure;
+        // env.push_scope();
         for (i, param) in self.declaration.parameters.iter().enumerate() {
             env.define(param.lexeme.clone(), args[i].clone());
         }
@@ -156,7 +162,7 @@ impl Callable for LoxFunction {
             Ok(None) => Ok(Value::Nil),
             Err(err) => Err(err)
         };
-        env.pop_scope();
+        // env.pop_scope();
         result
     }
 }
@@ -164,6 +170,12 @@ impl Callable for LoxFunction {
 impl fmt::Display for LoxFunction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "<fun {}>", self.declaration.name.lexeme)
+    }
+}
+
+impl PartialEq for LoxFunction {
+    fn eq(&self, other: &LoxFunction) -> bool {
+        self.declaration == other.declaration
     }
 }
 
@@ -202,7 +214,7 @@ impl ast::Expr {
                 }
 
                 match callee {
-                    Value::Function(fun) => call(&call_expr.paren, fun, env, arguments),
+                    Value::Function(fun) => call(&call_expr.paren, fun, arguments),
                     // Value::Class(class) => call(class, env, arguments),
                     _ => runtime_error(&call_expr.paren, "Can only call functions and classes.")
                 }
@@ -250,7 +262,7 @@ impl ast::Expr {
             &ast::Expr::Variable(ref var_expr) => {
                 let name = &var_expr.name;
                 match env.get(&name.lexeme) {
-                    Some(val) => Ok(val.clone()),
+                    Some(val) => Ok(val.clone()), // TODO: this is breaking closures
                     None => runtime_error(name, &format!("Undefined variable '{}'", name.lexeme))
                 }
             },
