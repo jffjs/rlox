@@ -262,7 +262,7 @@ impl ast::Expr {
             &ast::Expr::Variable(ref var_expr) => {
                 let name = &var_expr.name;
                 match env.get(&name.lexeme) {
-                    Some(val) => Ok(val.clone()), // TODO: this is breaking closures
+                    Some(val) => Ok(Value::Nil /*val.clone()*/), // TODO: this is breaking closures
                     None => runtime_error(name, &format!("Undefined variable '{}'", name.lexeme))
                 }
             },
