@@ -1,12 +1,12 @@
+use crate::token::{Literal, Token, TokenType};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::str;
-use token::{Literal, Token, TokenType};
 
 #[derive(Debug)]
 pub struct UnexpectedCharError {
-    line: u32
+    line: u32,
 }
 
 impl fmt::Display for UnexpectedCharError {
@@ -27,7 +27,7 @@ impl Error for UnexpectedCharError {
 
 #[derive(Debug)]
 pub struct UnterminatedStringError {
-    line: u32
+    line: u32,
 }
 
 impl fmt::Display for UnterminatedStringError {
@@ -53,7 +53,7 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: u32,
-    keywords: HashMap<String, TokenType>
+    keywords: HashMap<String, TokenType>,
 }
 
 impl Scanner {
@@ -61,7 +61,15 @@ impl Scanner {
         let tokens: Vec<Token> = vec![];
         let source_len = source.chars().count();
         let keywords = keywords_map();
-        Scanner { source, source_len, tokens, keywords, start: 0, current: 0, line: 1 }
+        Scanner {
+            source,
+            source_len,
+            tokens,
+            keywords,
+            start: 0,
+            current: 0,
+            line: 1,
+        }
     }
 
     pub fn scan_tokens(mut self) -> Result<Vec<Token>, Vec<Box<Error>>> {
@@ -71,7 +79,7 @@ impl Scanner {
             self.start = self.current;
             match self.scan_token() {
                 Err(e) => errors.push(e),
-                _ => ()
+                _ => (),
             }
         }
 
@@ -79,8 +87,8 @@ impl Scanner {
             TokenType::Eof,
             String::from(""),
             None,
-            self.line)
-        );
+            self.line,
+        ));
 
         if errors.len() > 0 {
             Err(errors)
@@ -96,7 +104,7 @@ impl Scanner {
             '\n' => {
                 self.inc_line();
                 Ok(())
-            },
+            }
             '(' => self.add_token(TokenType::LeftParen, None),
             ')' => self.add_token(TokenType::RightParen, None),
             '{' => self.add_token(TokenType::LeftBrace, None),
@@ -110,19 +118,19 @@ impl Scanner {
             '!' => {
                 let t_type = self.next_match_else('=', TokenType::BangEqual, TokenType::Bang);
                 self.add_token(t_type, None)
-            },
+            }
             '=' => {
                 let t_type = self.next_match_else('=', TokenType::EqualEqual, TokenType::Equal);
                 self.add_token(t_type, None)
-            },
+            }
             '<' => {
                 let t_type = self.next_match_else('=', TokenType::LessEqual, TokenType::Less);
                 self.add_token(t_type, None)
-            },
+            }
             '>' => {
                 let t_type = self.next_match_else('=', TokenType::GreaterEqual, TokenType::Greater);
                 self.add_token(t_type, None)
-            },
+            }
             '/' => {
                 if self.next_match('/') {
                     while self.peek() != '\n' && !self.is_at_end() {
@@ -132,7 +140,7 @@ impl Scanner {
                 } else {
                     self.add_token(TokenType::Slash, None)
                 }
-            },
+            }
             '"' => self.handle_string_literal(),
             _ => {
                 if is_digit(c) {
@@ -146,9 +154,14 @@ impl Scanner {
         }
     }
 
-    fn add_token(&mut self, token_type: TokenType, literal: Option<Literal>) -> Result<(), Box<Error>> {
+    fn add_token(
+        &mut self,
+        token_type: TokenType,
+        literal: Option<Literal>,
+    ) -> Result<(), Box<Error>> {
         let lexeme = substr(&self.source, self.start, self.current);
-        self.tokens.push(Token::new(token_type, lexeme, literal, self.line));
+        self.tokens
+            .push(Token::new(token_type, lexeme, literal, self.line));
         Ok(())
     }
 
@@ -161,7 +174,7 @@ impl Scanner {
         }
 
         if self.is_at_end() {
-            return Err(Box::new(UnterminatedStringError { line: self.line }))
+            return Err(Box::new(UnterminatedStringError { line: self.line }));
         }
 
         // closing "
@@ -200,14 +213,14 @@ impl Scanner {
         let text = substr(&self.source, self.start, self.current);
         let token_type = match self.keywords.get(&text) {
             Some(keyword) => *keyword,
-            None => TokenType::Identifier
+            None => TokenType::Identifier,
         };
 
         let literal = match token_type {
             TokenType::True => Some(Literal::True),
             TokenType::False => Some(Literal::False),
             TokenType::Nil => Some(Literal::Nil),
-            _ => None
+            _ => None,
         };
 
         self.add_token(token_type, literal)
@@ -236,7 +249,7 @@ impl Scanner {
 
     fn next_match(&mut self, expected: char) -> bool {
         if self.is_at_end() {
-            return false
+            return false;
         }
 
         let curr_char = self.char_at(self.current);
@@ -249,9 +262,14 @@ impl Scanner {
         }
     }
 
-    fn next_match_else(&mut self, expected: char, expected_token: TokenType, else_token: TokenType) -> TokenType {
+    fn next_match_else(
+        &mut self,
+        expected: char,
+        expected_token: TokenType,
+        else_token: TokenType,
+    ) -> TokenType {
         if self.is_at_end() {
-            return else_token
+            return else_token;
         }
 
         let curr_char = self.char_at(self.current);
@@ -290,9 +308,7 @@ fn is_digit(c: char) -> bool {
 }
 
 fn is_alpha(c: char) -> bool {
-    (c >= 'a' && c <= 'z') ||
-        (c >= 'A' && c <= 'Z') ||
-        c == '_'
+    (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
 }
 
 fn is_alphanumeric(c: char) -> bool {

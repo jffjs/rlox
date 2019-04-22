@@ -1,15 +1,18 @@
+use crate::eval::Value;
 use std::collections::HashMap;
-use eval::Value;
 
 #[derive(Clone, Debug)]
 pub struct Environment {
     scopes: Vec<HashMap<String, Value>>,
-    current_scope: usize
+    current_scope: usize,
 }
 
 impl Environment {
     pub fn new() -> Environment {
-        Environment { scopes: vec![HashMap::new()], current_scope: 0 }
+        Environment {
+            scopes: vec![HashMap::new()],
+            current_scope: 0,
+        }
     }
 
     pub fn push_scope(&mut self) {
@@ -20,7 +23,7 @@ impl Environment {
     pub fn pop_scope(&mut self) {
         match self.scopes.pop() {
             Some(_) => self.current_scope -= 1,
-            None => ()
+            None => (),
         }
     }
 
@@ -54,7 +57,7 @@ impl Environment {
         while scope != 0 {
             match self.get_in_scope(name, scope) {
                 Some(val) => return Some(val),
-                None => scope -= 1
+                None => scope -= 1,
             }
         }
         self.get_in_scope(name, scope)
@@ -67,8 +70,7 @@ impl Environment {
 
 #[cfg(test)]
 mod env_tests {
-    use env::Environment;
-    use eval::Value;
+    use super::*;
 
     #[test]
     fn define_and_get() {
@@ -110,7 +112,6 @@ mod env_tests {
 
         assert_eq!(Value::Number(5.0), *env.get(&key).unwrap());
     }
-
 
     #[test]
     fn assign_to_parent() {
