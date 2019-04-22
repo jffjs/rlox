@@ -1,23 +1,24 @@
-mod scanner;
-mod parser;
-mod token;
 mod ast;
-mod eval;
 mod env;
+mod eval;
+mod parser;
+mod scanner;
+mod token;
 
-use std::error::Error;
-use std::fmt;
 use env::Environment;
 use parser::parse;
 use scanner::Scanner;
+use std::{error::Error, fmt, rc::Rc};
 
 pub struct Interpreter {
-    env: Environment
+    env: Rc<Environment>,
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
-        Interpreter { env: Environment::new() }
+        Interpreter {
+            env: Rc::new(Environment::new()),
+        }
     }
 
     pub fn run(&mut self, source: String) -> Result<(), LoxError> {
@@ -27,15 +28,15 @@ impl Interpreter {
             Err(errors) => {
                 Interpreter::report_errors(errors);
                 Err(LoxError)
-            },
+            }
             Ok(tokens) => {
                 let mut errors: Vec<Box<Error>> = vec![];
                 match parse(&tokens) {
                     Ok(statements) => {
                         for statement in statements {
-                            match statement.execute(&mut self.env) {
+                            match statement.execute(self.env.clone()) {
                                 Ok(_) => (),
-                                Err(error) => errors.push(Box::new(error))
+                                Err(error) => errors.push(Box::new(error)),
                             }
                         }
                         if errors.len() > 0 {
@@ -44,7 +45,7 @@ impl Interpreter {
                         } else {
                             Ok(())
                         }
-                    },
+                    }
                     Err(errors) => {
                         Interpreter::report_errors(errors);
                         Err(LoxError)
@@ -79,4 +80,3 @@ impl Error for LoxError {
         None
     }
 }
-
