@@ -1,3 +1,7 @@
+use crate::interpreter::InterpreterResult;
+use ast::token::Token;
+use std::{error::Error, fmt};
+
 #[derive(Debug)]
 pub struct RuntimeError {
     msg: String,
@@ -26,6 +30,6 @@ impl Error for RuntimeError {
     }
 }
 
-fn runtime_error(token: &token::Token, msg: &str) -> Result<Value, RuntimeError> {
+pub fn runtime_error_result(token: &Token, msg: &str) -> InterpreterResult {
     Result::Err(RuntimeError::new(token.line, String::from(msg)))
 }

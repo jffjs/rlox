@@ -1,3 +1,6 @@
+use crate::function::LoxFunction;
+use std::fmt;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Nil,

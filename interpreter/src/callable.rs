@@ -1,16 +1,23 @@
+use crate::{
+    interpreter::{Interpreter, InterpreterResult},
+    runtime_error::runtime_error_result,
+    value::Value,
+};
+use ast::token::Token;
+
 pub trait Callable {
     fn arity(&self) -> usize;
-    fn call(&self, env: Rc<Environment>, args: Vec<Value>) -> Result<Value, RuntimeError>;
+    fn call(&self, int: &mut Interpreter, args: Vec<Value>) -> InterpreterResult;
 }
 
 pub fn call<T: Callable>(
-    paren: &token::Token,
+    paren: &Token,
     callee: T,
-    env: Rc<Environment>,
+    int: &mut Interpreter,
     args: Vec<Value>,
-) -> Result<Value, RuntimeError> {
+) -> InterpreterResult {
     if callee.arity() != args.len() {
-        return runtime_error(
+        return runtime_error_result(
             paren,
             &format!(
                 "Expected {} arguments but got {}.",
@@ -19,5 +26,5 @@ pub fn call<T: Callable>(
             ),
         );
     }
-    callee.call(env, args)
+    callee.call(int, args)
 }
