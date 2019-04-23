@@ -1,15 +1,17 @@
 [package]
 name = "rlox"
 version = "0.1.0"
-authors = ["Jeff Smith <jsmith3@vonage.com>"]
+authors = ["Jeff Smith <jffreyjs@gmail.com>"]
 edition = "2018"
 
 [workspace]
 members = [
   "ast",
-  "interpreter"
+  "interpreter",
+  "parser",
 ]
 
 [dependencies]
 ast = { path = "./ast" }
 interpreter = { path = "./interpreter" }
+parser = { path = "./parser" }

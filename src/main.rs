@@ -1,10 +1,10 @@
 extern crate rlox;
 
+use rlox::Repl;
 use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::process;
-use rlox::Interpreter;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -20,13 +20,14 @@ fn main() {
 }
 
 fn run_file(filename: &str) {
-    let mut interpreter = Interpreter::new();
+    // let mut interpreter = Interpreter::new();
+    let mut interpreter = Repl::new();
     let mut source = String::new();
     match File::open(filename) {
         Ok(mut f) => match f.read_to_string(&mut source) {
             Ok(_) => match interpreter.run(source) {
                 Ok(_) => (),
-                Err(_) => process::exit(70)
+                Err(_) => process::exit(70),
             },
             Err(e) => {
                 eprintln!("{}", e);
@@ -41,7 +42,8 @@ fn run_file(filename: &str) {
 }
 
 fn run_prompt() {
-    let mut interpreter = Interpreter::new();
+    // let mut interpreter = Interpreter::new();
+    let mut interpreter = Repl::new();
     loop {
         let mut line = String::new();
         print!(">");
@@ -49,10 +51,9 @@ fn run_prompt() {
         match io::stdin().read_line(&mut line) {
             Ok(_) => match interpreter.run(line) {
                 Ok(_) => (),
-                Err(_) => ()
+                Err(_) => (),
             },
-            Err(e) => panic!(e)
+            Err(e) => panic!(e),
         }
     }
 }
-

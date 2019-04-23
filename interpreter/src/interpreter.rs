@@ -10,7 +10,7 @@ use ast::{
     visitor::Visitor,
     Expr, Stmt,
 };
-use std::rc::Rc;
+use std::{error::Error, rc::Rc};
 
 pub type InterpreterResult = Result<Option<Value>, RuntimeError>;
 
@@ -25,11 +25,20 @@ impl Interpreter {
         }
     }
 
-    pub fn run(&mut self, stmts: Vec<Stmt>) -> InterpreterResult {
+    pub fn run(&mut self, stmts: Vec<Stmt>) -> Result<(), Vec<Box<Error>>> {
+        let mut errors: Vec<Box<Error>> = vec![];
         for stmt in stmts.iter() {
-            self.visit_stmt(stmt)?;
+            match self.visit_stmt(stmt) {
+                Ok(_) => (),
+                Err(err) => errors.push(Box::new(err)),
+            }
         }
-        Ok(None)
+
+        if errors.len() == 0 {
+            Ok(())
+        } else {
+            Err(errors)
+        }
     }
 }
 

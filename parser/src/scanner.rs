@@ -1,4 +1,4 @@
-use crate::token::{Literal, Token, TokenType};
+use ast::token::{Literal, Token, TokenType};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;

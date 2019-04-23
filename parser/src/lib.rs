@@ -1,5 +1,9 @@
-use crate::ast;
-use crate::token::{Literal, Token, TokenType};
+extern crate ast;
+
+mod scanner;
+
+use crate::scanner::Scanner;
+use ast::token::{Literal, Token, TokenType};
 use std::error::Error;
 use std::fmt;
 
@@ -14,12 +18,14 @@ enum ExprResult<'a> {
     Err(&'a str, usize),
 }
 
-pub fn parse(tokens: &Vec<Token>) -> Result<Vec<ast::Stmt>, Vec<Box<Error>>> {
+pub fn parse(source: String) -> Result<Vec<ast::Stmt>, Vec<Box<Error>>> {
+    let scanner = Scanner::new(source);
+    let tokens = scanner.scan_tokens()?;
     let mut statements: Vec<ast::Stmt> = vec![];
     let mut errors: Vec<Box<Error>> = vec![];
     let mut pos = 0;
     while tokens[pos].token_type != TokenType::Eof {
-        match declaration(tokens, pos) {
+        match declaration(&tokens, pos) {
             StmtResult::Ok(stmt, next_pos) => {
                 statements.push(stmt);
                 pos = next_pos;

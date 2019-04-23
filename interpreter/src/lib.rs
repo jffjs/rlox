@@ -1,4 +1,5 @@
 extern crate ast;
+use std::error::Error;
 
 mod callable;
 mod environment;
@@ -19,7 +20,7 @@ impl Interpreter {
         }
     }
 
-    pub fn run(&mut self, program: Vec<ast::Stmt>) -> Result<(), runtime_error::RuntimeError> {
-        self.internal.run(program).map(|_| ())
+    pub fn run(&mut self, program: Vec<ast::Stmt>) -> Result<(), Vec<Box<Error>>> {
+        self.internal.run(program)
     }
 }
