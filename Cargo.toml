@@ -4,4 +4,10 @@ version = "0.1.0"
 authors = ["Jeff Smith <jsmith3@vonage.com>"]
 edition = "2018"
 
+[workspace]
+members = [
+  "ast"
+]
+
 [dependencies]
+ast = { path = "./ast" }

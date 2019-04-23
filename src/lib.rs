@@ -1,3 +1,5 @@
+// extern crate ast;
+
 mod ast;
 mod env;
 mod eval;
