@@ -6,8 +6,10 @@ edition = "2018"
 
 [workspace]
 members = [
-  "ast"
+  "ast",
+  "interpreter"
 ]
 
 [dependencies]
 ast = { path = "./ast" }
+interpreter = { path = "./interpreter" }
