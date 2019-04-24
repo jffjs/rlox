@@ -2,7 +2,10 @@ pub mod token;
 pub mod visitor;
 
 use crate::token::{Literal, Token};
+use snowflake::ProcessUniqueId;
 use std::fmt;
+
+pub type ScopeId = ProcessUniqueId;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Stmt {
@@ -281,6 +284,7 @@ impl Expr {
 pub struct AssignExpr {
     pub name: Token,
     pub value: Box<Expr>,
+    pub scope_id: ScopeId,
 }
 
 impl AssignExpr {
@@ -288,6 +292,7 @@ impl AssignExpr {
         AssignExpr {
             name,
             value: Box::new(value),
+            scope_id: ScopeId::new(),
         }
     }
 }
@@ -385,10 +390,14 @@ impl UnaryExpr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct VariableExpr {
     pub name: Token,
+    pub scope_id: ScopeId,
 }
 
 impl VariableExpr {
     fn new(name: Token) -> VariableExpr {
-        VariableExpr { name }
+        VariableExpr {
+            name,
+            scope_id: ScopeId::new(),
+        }
     }
 }

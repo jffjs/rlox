@@ -23,6 +23,7 @@ fn run_file(filename: &str) {
     // let mut interpreter = Interpreter::new();
     let mut interpreter = Repl::new();
     let mut source = String::new();
+
     match File::open(filename) {
         Ok(mut f) => match f.read_to_string(&mut source) {
             Ok(_) => match interpreter.run(source) {

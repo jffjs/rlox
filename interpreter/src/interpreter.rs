@@ -1,9 +1,10 @@
 use crate::{
     callable::call,
     environment::Environment,
+    error::{runtime_error_result, ResolverError, RuntimeError},
     function::LoxFunction,
     native::define_native_functions,
-    runtime_error::{runtime_error_result, RuntimeError},
+    resolver::Resolver,
     value::Value,
 };
 use ast::{
@@ -17,6 +18,7 @@ pub type InterpreterResult = Result<Option<Value>, RuntimeError>;
 
 pub struct Interpreter {
     pub environment: Rc<Environment>,
+    resolver: Resolver,
 }
 
 impl Interpreter {
@@ -26,10 +28,19 @@ impl Interpreter {
         environment.push_scope();
         Interpreter {
             environment: Rc::new(environment),
+            resolver: Resolver::new(),
         }
     }
 
     pub fn run(&mut self, stmts: Vec<Stmt>) -> Result<(), Vec<Box<Error>>> {
+        self.resolver.resolve(&stmts).map_err(|errs| {
+            let mut boxed: Vec<Box<Error>> = vec![];
+            for e in errs {
+                boxed.push(Box::new(e));
+            }
+            boxed
+        })?;
+
         let mut errors: Vec<Box<Error>> = vec![];
         for stmt in stmts.iter() {
             match self.visit_stmt(stmt) {

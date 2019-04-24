@@ -5,3 +5,4 @@ authors = ["Jeff Smith <jffreyjs@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+snowflake = "1.2"

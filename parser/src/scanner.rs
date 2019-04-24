@@ -6,7 +6,7 @@ use std::str;
 
 #[derive(Debug)]
 pub struct UnexpectedCharError {
-    line: u32,
+    line: usize,
 }
 
 impl fmt::Display for UnexpectedCharError {
@@ -27,7 +27,7 @@ impl Error for UnexpectedCharError {
 
 #[derive(Debug)]
 pub struct UnterminatedStringError {
-    line: u32,
+    line: usize,
 }
 
 impl fmt::Display for UnterminatedStringError {
@@ -52,7 +52,7 @@ pub struct Scanner {
     tokens: Vec<Token>,
     start: usize,
     current: usize,
-    line: u32,
+    line: usize,
     keywords: HashMap<String, TokenType>,
 }
 

@@ -113,7 +113,7 @@ impl Environment {
 }
 
 #[cfg(test)]
-mod env_tests {
+mod tests {
     use super::*;
 
     #[test]

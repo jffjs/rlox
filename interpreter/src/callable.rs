@@ -1,6 +1,6 @@
 use crate::{
+    error::runtime_error_result,
     interpreter::{Interpreter, InterpreterResult},
-    runtime_error::runtime_error_result,
     value::Value,
 };
 use ast::token::Token;

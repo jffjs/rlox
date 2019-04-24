@@ -657,7 +657,7 @@ fn check_token(token: &Token, tok_type: TokenType) -> bool {
 #[derive(Debug)]
 pub struct ParseError {
     msg: String,
-    line: u32,
+    line: usize,
     lexeme: String,
 }
 
@@ -678,7 +678,7 @@ impl Error for ParseError {
 }
 
 impl ParseError {
-    fn new(line: u32, lexeme: String, msg: String) -> ParseError {
+    fn new(line: usize, lexeme: String, msg: String) -> ParseError {
         ParseError { line, lexeme, msg }
     }
 }

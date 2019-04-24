@@ -3,10 +3,11 @@ use std::error::Error;
 
 mod callable;
 mod environment;
+mod error;
 mod function;
 mod interpreter;
 mod native;
-mod runtime_error;
+mod resolver;
 mod value;
 
 // Public interface
