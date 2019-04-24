@@ -9,7 +9,7 @@ pub struct RuntimeError {
 }
 
 impl RuntimeError {
-    fn new(line: u32, msg: String) -> RuntimeError {
+    pub fn new(line: u32, msg: String) -> RuntimeError {
         RuntimeError { msg, line }
     }
 }

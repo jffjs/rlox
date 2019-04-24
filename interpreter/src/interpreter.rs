@@ -154,8 +154,8 @@ impl Visitor<InterpreterResult> for Interpreter {
                     arguments.push((self.visit_expr(arg)?).unwrap());
                 }
                 match callee.unwrap() {
-                    Value::Function(fun) => call(&call_expr.paren, fun, self, arguments),
-                    Value::NativeFunction(fun) => call(&call_expr.paren, fun, self, arguments),
+                    Value::Function(fun) => call(&call_expr.paren, &fun, self, arguments),
+                    Value::NativeFunction(fun) => call(&call_expr.paren, &fun, self, arguments),
                     _ => runtime_error_result(
                         &call_expr.paren,
                         "Can only call functions and classes.",

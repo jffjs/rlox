@@ -12,7 +12,7 @@ pub trait Callable {
 
 pub fn call<T: Callable>(
     paren: &Token,
-    callee: T,
+    callee: &T,
     int: &mut Interpreter,
     args: Vec<Value>,
 ) -> InterpreterResult {

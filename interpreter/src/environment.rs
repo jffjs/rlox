@@ -1,14 +1,17 @@
+use crate::function::LoxFunction;
 use crate::value::Value;
+use snowflake::ProcessUniqueId;
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
 };
 
-type Scope = HashMap<String, Value>;
+pub type Scope = HashMap<String, Value>;
 
 #[derive(Clone, Debug)]
 pub struct Environment {
     scopes: RefCell<Vec<Scope>>,
+    closures: RefCell<HashMap<ProcessUniqueId, Scope>>,
     current_scope: Cell<usize>,
 }
 
@@ -17,6 +20,7 @@ impl Environment {
         Environment {
             scopes: RefCell::new(vec![HashMap::new()]),
             current_scope: Cell::new(0),
+            closures: RefCell::new(HashMap::new()),
         }
     }
 
@@ -26,12 +30,40 @@ impl Environment {
         self.scopes.borrow_mut().push(HashMap::new());
     }
 
+    pub fn push_scope_fun(&self, fun: &LoxFunction) {
+        if let Some(closure) = self.closures.borrow().get(&fun.id) {
+            let scope = self.current_scope.get();
+            self.current_scope.set(scope + 1);
+            self.scopes.borrow_mut().push(closure.clone());
+        }
+        self.push_scope();
+    }
+
     pub fn pop_scope(&self) {
         let scope = self.current_scope.get();
         match self.scopes.borrow_mut().pop() {
             Some(_) => self.current_scope.set(scope - 1),
             None => (),
         }
+    }
+
+    pub fn pop_scope_fun(&self, fun: &LoxFunction) {
+        self.pop_scope();
+        if self.closures.borrow().contains_key(&fun.id) {
+            if let Some(closure) = self.scopes.borrow_mut().pop() {
+                self.closures.borrow_mut().insert(fun.id, closure.clone());
+                self.current_scope.set(self.current_scope.get() - 1);
+            }
+        }
+    }
+
+    pub fn create_closure(&self, fun: &LoxFunction) {
+        let closure = self.closure();
+        self.closures.borrow_mut().insert(fun.id, closure);
+    }
+
+    pub fn closure(&self) -> Scope {
+        self.scopes.borrow()[self.current_scope.get()].clone()
     }
 
     pub fn assign(&self, name: String, val: Value) -> Result<(), String> {
