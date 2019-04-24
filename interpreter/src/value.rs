@@ -1,4 +1,4 @@
-use crate::function::LoxFunction;
+use crate::function::{LoxFunction, NativeFunction};
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -7,7 +7,7 @@ pub enum Value {
     Boolean(bool),
     // Class(Class),
     Function(LoxFunction),
-    // NativeFun(NativeFun),
+    NativeFunction(NativeFunction),
     Number(f64),
     String(String),
 }
@@ -15,11 +15,12 @@ pub enum Value {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            &Value::Nil => write!(f, "nil"),
-            &Value::Boolean(b) => write!(f, "{}", b),
-            &Value::Function(ref fun) => write!(f, "<fun {}>", fun),
-            &Value::Number(n) => write!(f, "{}", n),
-            &Value::String(ref s) => write!(f, "\"{}\"", s),
+            Value::Nil => write!(f, "nil"),
+            Value::Boolean(b) => write!(f, "{}", b),
+            Value::Function(ref fun) => write!(f, "{}", fun),
+            Value::Number(n) => write!(f, "{}", n),
+            Value::String(ref s) => write!(f, "\"{}\"", s),
+            Value::NativeFunction(ref fun) => write!(f, "{}", fun),
         }
     }
 }
@@ -27,11 +28,12 @@ impl fmt::Display for Value {
 impl Value {
     pub fn print(&self) -> String {
         match self {
-            &Value::Nil => format!("nil"),
-            &Value::Boolean(b) => format!("{}", b),
-            &Value::Function(ref fun) => format!("{}", fun),
-            &Value::Number(n) => format!("{}", n),
-            &Value::String(ref s) => format!("{}", s),
+            Value::Nil => format!("nil"),
+            Value::Boolean(b) => format!("{}", b),
+            Value::Function(fun) => format!("{}", fun),
+            Value::Number(n) => format!("{}", n),
+            Value::String(s) => format!("{}", s),
+            Value::NativeFunction(fun) => format!("{}", fun),
         }
     }
 }

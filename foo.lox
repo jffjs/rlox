@@ -1,3 +1,4 @@
+var start = clock();
 fun fibonacci(n) {
   if (n <= 1) return n;
   return fibonacci(n - 2) + fibonacci(n - 1);
@@ -6,3 +7,7 @@ fun fibonacci(n) {
 for (var i = 0; i < 20; i = i + 1) {
   print fibonacci(i);
 }
+print "";
+print "ms:";
+print (clock() - start) / 1000;
+print 20 - 10 / 5;

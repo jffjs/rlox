@@ -5,6 +5,7 @@ mod callable;
 mod environment;
 mod function;
 mod interpreter;
+mod native;
 mod runtime_error;
 mod value;
 

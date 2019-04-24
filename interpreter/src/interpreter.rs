@@ -2,6 +2,7 @@ use crate::{
     callable::call,
     environment::Environment,
     function::LoxFunction,
+    native::define_native_functions,
     runtime_error::{runtime_error_result, RuntimeError},
     value::Value,
 };
@@ -20,8 +21,11 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new() -> Interpreter {
+        let mut environment = Environment::new();
+        define_native_functions(&mut environment);
+        environment.push_scope();
         Interpreter {
-            environment: Rc::new(Environment::new()),
+            environment: Rc::new(environment),
         }
     }
 
@@ -151,6 +155,7 @@ impl Visitor<InterpreterResult> for Interpreter {
                 }
                 match callee.unwrap() {
                     Value::Function(fun) => call(&call_expr.paren, fun, self, arguments),
+                    Value::NativeFunction(fun) => call(&call_expr.paren, fun, self, arguments),
                     _ => runtime_error_result(
                         &call_expr.paren,
                         "Can only call functions and classes.",
@@ -237,6 +242,10 @@ fn is_equal(a: Value, b: Value) -> bool {
         },
         Value::String(a_str) => match b {
             Value::String(b_str) => a_str.eq(&b_str),
+            _ => false,
+        },
+        Value::NativeFunction(a_fun) => match b {
+            Value::NativeFunction(b_fun) => &a_fun == &b_fun,
             _ => false,
         },
     }
