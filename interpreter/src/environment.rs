@@ -13,6 +13,7 @@ pub struct Environment {
     scopes: RefCell<Vec<Scope>>,
     closures: RefCell<HashMap<ProcessUniqueId, Scope>>,
     current_scope: Cell<usize>,
+    in_closure: Cell<bool>,
 }
 
 impl Environment {
@@ -21,6 +22,7 @@ impl Environment {
             scopes: RefCell::new(vec![HashMap::new()]),
             current_scope: Cell::new(0),
             closures: RefCell::new(HashMap::new()),
+            in_closure: Cell::new(false),
         }
     }
 
@@ -36,7 +38,8 @@ impl Environment {
             self.current_scope.set(scope + 1);
             self.scopes.borrow_mut().push(closure.clone());
         }
-        // self.push_scope();
+        self.push_scope();
+        self.in_closure.set(true);
     }
 
     pub fn pop_scope(&self) {
@@ -48,7 +51,8 @@ impl Environment {
     }
 
     pub fn pop_scope_fun(&self, fun: &LoxFunction) {
-        // self.pop_scope();
+        self.in_closure.set(false);
+        self.pop_scope();
         if self.closures.borrow().contains_key(&fun.id) {
             if let Some(closure) = self.scopes.borrow_mut().pop() {
                 self.closures.borrow_mut().insert(fun.id, closure.clone());
@@ -71,7 +75,7 @@ impl Environment {
     }
 
     pub fn assign_at(&self, name: String, val: Value, distance: usize) -> Result<(), String> {
-        let mut current_scope = self.current_scope.get() - distance;
+        let mut current_scope = self.current_scope.get() - distance - self.closure_modifier();
 
         while current_scope != 0 {
             let scope = &mut self.scopes.borrow_mut()[current_scope];
@@ -102,7 +106,7 @@ impl Environment {
     }
 
     pub fn get_at(&self, name: &String, distance: usize) -> Option<Value> {
-        let mut scope = self.current_scope.get() - distance;
+        let mut scope = self.current_scope.get() - distance - self.closure_modifier();
         while scope != 0 {
             match self.get_in_scope(name, scope) {
                 Some(val) => return Some(val),
@@ -117,6 +121,14 @@ impl Environment {
             return Some(value.clone());
         }
         None
+    }
+
+    fn closure_modifier(&self) -> usize {
+        if self.in_closure.get() {
+            0
+        } else {
+            0
+        }
     }
 }
 
