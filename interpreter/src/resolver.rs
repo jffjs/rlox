@@ -1,5 +1,5 @@
 use crate::error::ResolverError;
-use ast::{visitor::Visitor, Expr, ScopeId, Stmt};
+use ast::{visitor::Visitor, Expr, FunStmt, ScopeId, Stmt};
 use std::collections::HashMap;
 
 type Scope = HashMap<String, bool>;
@@ -42,6 +42,18 @@ impl Resolver {
         self.visit_expr(expr)
     }
 
+    fn resolve_function(&mut self, function: &FunStmt) -> ResolverResult {
+        self.push_scope();
+        for param in &function.parameters {
+            let name = &param.lexeme;
+            self.declare(name.clone());
+            self.define(name.clone());
+        }
+        self.resolve_stmt(&function.body)?;
+        self.pop_scope();
+        Ok(())
+    }
+
     fn push_scope(&mut self) {
         self.scopes.push(HashMap::new());
     }
@@ -77,24 +89,74 @@ impl Visitor<ResolverResult> for Resolver {
         match stmt {
             Stmt::Block(block_stmt) => {
                 self.push_scope();
-                self.resolve(&block_stmt.statements);
+                for statement in &block_stmt.statements {
+                    self.resolve_stmt(&statement)?;
+                }
                 self.pop_scope();
+            }
+            Stmt::Expr(expr_stmt) => self.resolve_expr(&expr_stmt.expression)?,
+            Stmt::Fun(fun_stmt) => {
+                let name = &fun_stmt.name.lexeme;
+                self.declare(name.clone());
+                self.define(name.clone());
+                self.resolve_function(fun_stmt)?;
+            }
+            Stmt::If(if_stmt) => {
+                self.resolve_expr(&if_stmt.condition)?;
+                self.resolve_stmt(&if_stmt.then_branch)?;
+                if let Some(else_branch) = &if_stmt.else_branch {
+                    self.resolve_stmt(else_branch)?;
+                }
+            }
+            Stmt::Print(print_stmt) => self.resolve_expr(&print_stmt.expression)?,
+            Stmt::Return(return_stmt) => {
+                if let Some(value) = &return_stmt.value {
+                    self.resolve_expr(value)?;
+                }
+            }
+            Stmt::While(while_stmt) => {
+                self.resolve_expr(&while_stmt.condition)?;
+                self.resolve_stmt(&while_stmt.body)?;
             }
             Stmt::Var(var_stmt) => {
                 let name = &var_stmt.name.lexeme;
                 self.declare(name.clone());
                 if let Some(initializer) = &var_stmt.initializer {
-                    self.resolve_expr(initializer);
+                    self.resolve_expr(initializer)?;
                 }
                 self.define(name.clone());
             }
-            _ => (),
         }
         Ok(())
     }
 
     fn visit_expr(&mut self, expr: &Expr) -> ResolverResult {
         match expr {
+            Expr::Assign(assign_expr) => {
+                self.resolve_expr(&assign_expr.value)?;
+                self.resolve_local(assign_expr.scope_id, &assign_expr.name.lexeme);
+            }
+            Expr::Binary(binary_expr) => {
+                self.resolve_expr(&binary_expr.left)?;
+                self.resolve_expr(&binary_expr.right)?;
+            }
+            Expr::Call(call_expr) => {
+                self.resolve_expr(&call_expr.callee)?;
+                for arg in &call_expr.arguments {
+                    self.resolve_expr(arg)?;
+                }
+            }
+            Expr::Grouping(grouping_expr) => {
+                self.resolve_expr(&grouping_expr.expression)?;
+            }
+            Expr::Literal(_) => (),
+            Expr::Logical(logical_expr) => {
+                self.resolve_expr(&logical_expr.left)?;
+                self.resolve_expr(&logical_expr.right)?;
+            }
+            Expr::Unary(unary_expr) => {
+                self.resolve_expr(&unary_expr.right)?;
+            }
             Expr::Variable(var_expr) => {
                 let name = &var_expr.name.lexeme;
                 if let Some(scope) = self.scopes.last() {
@@ -107,7 +169,6 @@ impl Visitor<ResolverResult> for Resolver {
                 }
                 self.resolve_local(var_expr.scope_id, name);
             }
-            _ => (),
         }
         Ok(())
     }
