@@ -1,7 +1,7 @@
 use crate::{
     callable::call,
     environment::Environment,
-    error::{runtime_error_result, ResolverError, RuntimeError},
+    error::{runtime_error_result, RuntimeError},
     function::LoxFunction,
     native::define_native_functions,
     resolver::Resolver,
@@ -10,7 +10,7 @@ use crate::{
 use ast::{
     token::{Literal, Token, TokenType},
     visitor::Visitor,
-    Expr, Stmt,
+    Expr, ScopeId, Stmt,
 };
 use std::{error::Error, rc::Rc};
 
@@ -53,6 +53,22 @@ impl Interpreter {
             Ok(())
         } else {
             Err(errors)
+        }
+    }
+
+    fn look_up_var(&self, name: &String, scope_id: &ScopeId) -> Option<Value> {
+        if let Some(distance) = self.resolver.locals.get(scope_id) {
+            self.environment.get_at(name, *distance)
+        } else {
+            self.environment.get(name)
+        }
+    }
+
+    fn assign_var(&mut self, name: String, value: Value, scope_id: &ScopeId) -> Result<(), String> {
+        if let Some(distance) = self.resolver.locals.get(scope_id) {
+            self.environment.assign_at(name, value, *distance)
+        } else {
+            self.environment.assign(name, value)
         }
     }
 }
@@ -144,10 +160,11 @@ impl Visitor<InterpreterResult> for Interpreter {
             Expr::Assign(assign_expr) => {
                 let name = &assign_expr.name;
                 let value = self.visit_expr(&assign_expr.value)?;
-                match self
-                    .environment
-                    .assign(name.lexeme.clone(), value.clone().unwrap())
-                {
+                match self.assign_var(
+                    name.lexeme.clone(),
+                    value.clone().unwrap(),
+                    &assign_expr.scope_id,
+                ) {
                     Ok(_) => Ok(value),
                     Err(msg) => runtime_error_result(name, &msg),
                 }
@@ -215,8 +232,8 @@ impl Visitor<InterpreterResult> for Interpreter {
             }
             Expr::Variable(var_expr) => {
                 let name = &var_expr.name;
-                if let Some(val) = self.environment.get(&name.lexeme) {
-                    Ok(Some(val.clone()))
+                if let Some(val) = self.look_up_var(&name.lexeme, &var_expr.scope_id) {
+                    Ok(Some(val))
                 } else {
                     runtime_error_result(name, &format!("Undefined variable '{}'", name.lexeme))
                 }

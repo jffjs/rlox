@@ -20,12 +20,14 @@ impl Resolver {
 
     pub fn resolve(&mut self, stmts: &Vec<Stmt>) -> Result<(), Vec<ResolverError>> {
         let mut errors = vec![];
+        self.push_scope();
         for stmt in stmts {
             match self.resolve_stmt(stmt) {
                 Ok(_) => (),
                 Err(err) => errors.push(err),
             }
         }
+        self.pop_scope();
 
         if errors.len() > 0 {
             Err(errors)
@@ -75,11 +77,15 @@ impl Resolver {
     }
 
     fn resolve_local(&mut self, scope_id: ScopeId, name: &String) {
-        for i in (1..self.scopes.len()).rev() {
-            if self.scopes[i].contains_key(name) {
-                self.locals.insert(scope_id, self.scopes.len() - 1 - i);
+        let mut i = (self.scopes.len() - 1) as isize;
+        println!("{:?}", self.scopes);
+        while i >= 0 {
+            let index = i as usize;
+            if self.scopes[index].contains_key(name) {
+                self.locals.insert(scope_id, self.scopes.len() - 1 - index);
                 return;
             }
+            i -= 1;
         }
     }
 }

@@ -36,7 +36,7 @@ impl Environment {
             self.current_scope.set(scope + 1);
             self.scopes.borrow_mut().push(closure.clone());
         }
-        self.push_scope();
+        // self.push_scope();
     }
 
     pub fn pop_scope(&self) {
@@ -48,7 +48,7 @@ impl Environment {
     }
 
     pub fn pop_scope_fun(&self, fun: &LoxFunction) {
-        self.pop_scope();
+        // self.pop_scope();
         if self.closures.borrow().contains_key(&fun.id) {
             if let Some(closure) = self.scopes.borrow_mut().pop() {
                 self.closures.borrow_mut().insert(fun.id, closure.clone());
@@ -67,7 +67,11 @@ impl Environment {
     }
 
     pub fn assign(&self, name: String, val: Value) -> Result<(), String> {
-        let mut current_scope = self.current_scope.get();
+        self.assign_at(name, val, 0)
+    }
+
+    pub fn assign_at(&self, name: String, val: Value, distance: usize) -> Result<(), String> {
+        let mut current_scope = self.current_scope.get() - distance;
 
         while current_scope != 0 {
             let scope = &mut self.scopes.borrow_mut()[current_scope];
@@ -94,7 +98,11 @@ impl Environment {
     }
 
     pub fn get(&self, name: &String) -> Option<Value> {
-        let mut scope = self.current_scope.get();
+        self.get_at(name, 0)
+    }
+
+    pub fn get_at(&self, name: &String, distance: usize) -> Option<Value> {
+        let mut scope = self.current_scope.get() - distance;
         while scope != 0 {
             match self.get_in_scope(name, scope) {
                 Some(val) => return Some(val),

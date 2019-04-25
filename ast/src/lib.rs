@@ -401,3 +401,17 @@ impl VariableExpr {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::token::TokenType;
+
+    #[test]
+    fn scope_id() {
+        let token = Token::new(TokenType::Identifier, "foo".to_string(), None, 1);
+        let expr = VariableExpr::new(token);
+
+        assert_eq!(expr, expr.clone());
+    }
+}
