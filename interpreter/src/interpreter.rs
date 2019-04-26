@@ -1,6 +1,6 @@
 use crate::{
     callable::call,
-    environment::Environment,
+    environment::v2::Environment,
     error::{runtime_error_result, RuntimeError},
     function::LoxFunction,
     native::define_native_functions,
@@ -17,17 +17,17 @@ use std::{error::Error, rc::Rc};
 pub type InterpreterResult = Result<Option<Value>, RuntimeError>;
 
 pub struct Interpreter {
-    pub environment: Rc<Environment>,
+    pub environment: Option<Box<Environment>>,
     resolver: Resolver,
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
-        let mut environment = Environment::new();
-        define_native_functions(&mut environment);
-        environment.push_scope();
+        let mut globals = Environment::new(None);
+        define_native_functions(&mut globals);
+        // environment.push_scope();
         Interpreter {
-            environment: Rc::new(environment),
+            environment: Some(Box::new(globals)),
             resolver: Resolver::new(),
         }
     }
@@ -56,19 +56,47 @@ impl Interpreter {
         }
     }
 
-    fn look_up_var(&self, name: &String, scope_id: &ScopeId) -> Option<Value> {
+    fn look_up_var(&mut self, name: &String, scope_id: &ScopeId) -> Option<Value> {
+        let environment = self.environment.take().unwrap();
+        let value;
         if let Some(distance) = self.resolver.locals.get(scope_id) {
-            self.environment.get_at(name, *distance)
+            value = environment.get_at(name, *distance)
         } else {
-            self.environment.get(name)
+            value = environment.get(name)
         }
+        self.environment = Some(environment);
+        value
     }
 
     fn assign_var(&mut self, name: String, value: Value, scope_id: &ScopeId) -> Result<(), String> {
+        let mut environment = self.environment.take().unwrap();
+        let result;
         if let Some(distance) = self.resolver.locals.get(scope_id) {
-            self.environment.assign_at(name, value, *distance)
+            result = environment.assign_at(name, value, *distance);
         } else {
-            self.environment.assign(name, value)
+            result = environment.assign(name, value);
+        }
+        self.environment = Some(environment);
+        result
+    }
+
+    pub fn define_var(&mut self, name: String, value: Value) {
+        let mut environment = self.environment.take().unwrap();
+        environment.define(name, value);
+        self.environment = Some(environment);
+    }
+
+    pub fn push_scope(&mut self) {
+        let parent = self.environment.take();
+        self.environment = Some(Box::new(Environment::new(parent)));
+    }
+
+    pub fn pop_scope(&mut self) {
+        let environment = self.environment.take();
+        self.environment = if let Some(env) = environment {
+            env.enclosing
+        } else {
+            None
         }
     }
 }
@@ -77,21 +105,21 @@ impl Visitor<InterpreterResult> for Interpreter {
     fn visit_stmt(&mut self, stmt: &Stmt) -> InterpreterResult {
         match stmt {
             Stmt::Block(block_stmt) => {
-                self.environment.push_scope();
+                self.push_scope();
                 for statement in &block_stmt.statements {
                     match self.visit_stmt(statement) {
                         Ok(None) => (),
                         Ok(Some(v)) => {
-                            self.environment.pop_scope();
+                            self.pop_scope();
                             return Ok(Some(v));
                         }
                         Err(err) => {
-                            self.environment.pop_scope();
+                            self.pop_scope();
                             return Err(err);
                         }
                     }
                 }
-                self.environment.pop_scope();
+                self.pop_scope();
                 Ok(None)
             }
             Stmt::Expr(expr_stmt) => {
@@ -99,9 +127,9 @@ impl Visitor<InterpreterResult> for Interpreter {
                 Ok(None)
             }
             Stmt::Fun(fun_stmt) => {
-                let fun = LoxFunction::new(fun_stmt.clone(), self.environment.clone());
-                self.environment
-                    .define(fun.declaration.name.lexeme.clone(), Value::Function(fun));
+                let replace_me = Rc::new(crate::environment::Environment::new());
+                let fun = LoxFunction::new(fun_stmt.clone(), replace_me.clone());
+                self.define_var(fun.declaration.name.lexeme.clone(), Value::Function(fun));
                 Ok(None)
             }
             Stmt::If(if_stmt) => {
@@ -138,7 +166,7 @@ impl Visitor<InterpreterResult> for Interpreter {
                 } else {
                     Value::Nil
                 };
-                self.environment.define(var_stmt.name.lexeme.clone(), value);
+                self.define_var(var_stmt.name.lexeme.clone(), value);
                 Ok(None)
             }
             Stmt::While(while_stmt) => {

@@ -132,15 +132,22 @@ impl Environment {
     }
 }
 
-mod v2 {
+pub mod v2 {
     use super::*;
 
     pub struct Environment {
-        enclosing: Option<Box<Environment>>,
+        pub enclosing: Option<Box<Environment>>,
         values: Scope,
     }
 
     impl Environment {
+        pub fn new(enclosing: Option<Box<Environment>>) -> Environment {
+            Environment {
+                enclosing,
+                values: HashMap::new(),
+            }
+        }
+
         pub fn define(&mut self, name: String, value: Value) {
             self.values.insert(name, value);
         }
@@ -154,7 +161,7 @@ mod v2 {
             if let Some(enclosing) = &mut self.enclosing {
                 enclosing.assign(name, value)
             } else {
-                Err("undefined".to_string())
+                Err(format!("Undefined variable '{}'.", name))
             }
         }
 
@@ -202,11 +209,12 @@ mod v2 {
 }
 #[cfg(test)]
 mod tests {
+    use super::v2::Environment;
     use super::*;
 
     #[test]
     fn define_and_get() {
-        let env = Environment::new();
+        let mut env = Environment::new(None);
         let key = String::from("foo");
         env.define(key.clone(), Value::Number(4.0));
 
@@ -215,7 +223,7 @@ mod tests {
 
     #[test]
     fn assign_success() {
-        let env = Environment::new();
+        let mut env = Environment::new(None);
         let key = String::from("foo");
         env.define(key.clone(), Value::Number(4.0));
         let _result = env.assign(key.clone(), Value::Boolean(true));
@@ -225,7 +233,7 @@ mod tests {
 
     #[test]
     fn assign_fail() {
-        let env = Environment::new();
+        let mut env = Environment::new(None);
         let key = String::from("foo");
         let err = env.assign(key.clone(), Value::Boolean(true)).unwrap_err();
 
@@ -234,44 +242,43 @@ mod tests {
 
     #[test]
     fn get_from_parent_scope() {
-        let env = Environment::new();
         let key = String::from("foo");
-        env.define(key.clone(), Value::Number(4.0));
-        env.push_scope();
+        let mut parent = Environment::new(None);
+        parent.define(key.clone(), Value::Number(4.0));
 
+        let mut env = Environment::new(Some(Box::new(parent)));
+
+        assert_eq!(env.get(&key), Some(Value::Number(4.0)));
         env.define(key.clone(), Value::Number(5.0));
-        env.push_scope();
-
-        assert_eq!(Value::Number(5.0), env.get(&key).unwrap());
+        assert_eq!(env.get(&key), Some(Value::Number(5.0)));
     }
 
     #[test]
     fn assign_to_parent() {
-        let env = Environment::new();
         let key = String::from("foo");
-        env.define(key.clone(), Value::Number(4.0));
-        assert_eq!(Value::Number(4.0), env.get(&key).unwrap());
+        let mut parent = Environment::new(None);
+        parent.define(key.clone(), Value::Number(4.0));
 
-        env.push_scope();
-        env.push_scope();
+        let mut env = Environment::new(Some(Box::new(parent)));
+
+        assert_eq!(env.get(&key), Some(Value::Number(4.0)));
         let _result = env.assign(key.clone(), Value::Number(5.0));
-
-        assert_eq!(Value::Number(5.0), env.get(&key).unwrap());
+        assert_eq!(env.get(&key), Some(Value::Number(5.0)));
     }
 
     #[test]
     fn shadow_var() {
-        let env = Environment::new();
         let key = String::from("foo");
-        env.define(key.clone(), Value::Number(4.0));
-        assert_eq!(Value::Number(4.0), env.get(&key).unwrap());
+        let mut parent = Environment::new(None);
+        parent.define(key.clone(), Value::Number(4.0));
 
-        env.push_scope();
+        let mut env = Environment::new(Some(Box::new(parent)));
+
+        assert_eq!(env.get(&key), Some(Value::Number(4.0)));
         env.define(key.clone(), Value::Number(5.0));
+        assert_eq!(env.get(&key), Some(Value::Number(5.0)));
 
-        assert_eq!(Value::Number(5.0), env.get(&key).unwrap());
-
-        env.pop_scope();
-        assert_eq!(Value::Number(4.0), env.get(&key).unwrap());
+        let env = env.enclosing.take().unwrap();
+        assert_eq!(env.get(&key), Some(Value::Number(4.0)));
     }
 }

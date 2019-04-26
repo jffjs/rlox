@@ -35,14 +35,13 @@ impl Callable for LoxFunction {
     }
 
     fn call(&self, int: &mut Interpreter, args: Vec<Value>) -> InterpreterResult {
-        int.environment.push_scope_fun(self);
+        // int.environment.push_scope_fun(self);
         for (i, param) in self.declaration.parameters.iter().enumerate() {
-            int.environment
-                .define(param.lexeme.clone(), args[i].clone());
+            int.define_var(param.lexeme.clone(), args[i].clone());
         }
 
         let result = int.visit_stmt(&self.declaration.body);
-        int.environment.pop_scope_fun(self);
+        // int.environment.pop_scope_fun(self);
         match result {
             Ok(None) => Ok(Some(Value::Nil)),
             _ => result,
