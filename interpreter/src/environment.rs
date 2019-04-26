@@ -132,6 +132,74 @@ impl Environment {
     }
 }
 
+mod v2 {
+    use super::*;
+
+    pub struct Environment {
+        enclosing: Option<Box<Environment>>,
+        values: Scope,
+    }
+
+    impl Environment {
+        pub fn define(&mut self, name: String, value: Value) {
+            self.values.insert(name, value);
+        }
+
+        pub fn assign(&mut self, name: String, value: Value) -> Result<(), String> {
+            if self.values.contains_key(&name) {
+                self.values.insert(name, value);
+                return Ok(());
+            }
+
+            if let Some(enclosing) = &mut self.enclosing {
+                enclosing.assign(name, value)
+            } else {
+                Err("undefined".to_string())
+            }
+        }
+
+        pub fn assign_at(
+            &mut self,
+            name: String,
+            value: Value,
+            distance: usize,
+        ) -> Result<(), String> {
+            if distance == 0 {
+                self.assign(name, value)
+            } else {
+                if let Some(enclosing) = &mut self.enclosing {
+                    enclosing.assign_at(name, value, distance - 1)
+                } else {
+                    Err(format!("Undefined variable '{}'", name))
+                }
+            }
+        }
+
+        pub fn get(&self, name: &String) -> Option<Value> {
+            if let Some(value) = self.values.get(name) {
+                Some(value.clone())
+            } else {
+                if let Some(enclosing) = &self.enclosing {
+                    enclosing.get(name)
+                } else {
+                    None
+                }
+            }
+        }
+
+        pub fn get_at(&self, name: &String, distance: usize) -> Option<Value> {
+            if distance == 0 {
+                self.get(name)
+            } else {
+                if let Some(enclosing) = &self.enclosing {
+                    enclosing.get_at(name, distance - 1)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
