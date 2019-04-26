@@ -7,7 +7,7 @@ use std::io::{self, Read, Write};
 use std::process;
 
 fn main() {
-    // run_file("resolve.lox");
+    // run_file("fib.lox");
     let args: Vec<String> = env::args().collect();
 
     if args.len() > 2 {

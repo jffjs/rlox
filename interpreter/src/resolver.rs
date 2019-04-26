@@ -51,7 +51,9 @@ impl Resolver {
             self.declare(name.clone());
             self.define(name.clone());
         }
-        self.resolve_stmt(&function.body)?;
+        for statement in &function.body {
+            self.resolve_stmt(&statement)?;
+        }
         self.pop_scope();
         Ok(())
     }
@@ -78,7 +80,6 @@ impl Resolver {
 
     fn resolve_local(&mut self, scope_id: ScopeId, name: &String) {
         let mut i = (self.scopes.len() - 1) as isize;
-        println!("{:?}", self.scopes);
         while i >= 0 {
             let index = i as usize;
             if self.scopes[index].contains_key(name) {

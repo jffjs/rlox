@@ -17,7 +17,7 @@ use std::{error::Error, rc::Rc};
 pub type InterpreterResult = Result<Option<Value>, RuntimeError>;
 
 pub struct Interpreter {
-    pub environment: Option<Box<Environment>>,
+    pub environment: Option<Rc<Environment>>,
     resolver: Resolver,
 }
 
@@ -25,9 +25,8 @@ impl Interpreter {
     pub fn new() -> Interpreter {
         let mut globals = Environment::new(None);
         define_native_functions(&mut globals);
-        // environment.push_scope();
         Interpreter {
-            environment: Some(Box::new(globals)),
+            environment: Some(Rc::new(globals)),
             resolver: Resolver::new(),
         }
     }
@@ -60,6 +59,7 @@ impl Interpreter {
         let environment = self.environment.take().unwrap();
         let value;
         if let Some(distance) = self.resolver.locals.get(scope_id) {
+            println!("{}", distance);
             value = environment.get_at(name, *distance)
         } else {
             value = environment.get(name)
@@ -69,7 +69,7 @@ impl Interpreter {
     }
 
     fn assign_var(&mut self, name: String, value: Value, scope_id: &ScopeId) -> Result<(), String> {
-        let mut environment = self.environment.take().unwrap();
+        let environment = self.environment.take().unwrap();
         let result;
         if let Some(distance) = self.resolver.locals.get(scope_id) {
             result = environment.assign_at(name, value, *distance);
@@ -81,20 +81,42 @@ impl Interpreter {
     }
 
     pub fn define_var(&mut self, name: String, value: Value) {
-        let mut environment = self.environment.take().unwrap();
+        let environment = self.environment.take().unwrap();
         environment.define(name, value);
         self.environment = Some(environment);
     }
 
-    pub fn push_scope(&mut self) {
-        let parent = self.environment.take();
-        self.environment = Some(Box::new(Environment::new(parent)));
+    pub fn execute_block(
+        &mut self,
+        statements: &Vec<Stmt>,
+        environment: Rc<Environment>,
+    ) -> InterpreterResult {
+        self.push_scope(environment);
+        for statement in statements {
+            match self.visit_stmt(statement) {
+                Ok(None) => (),
+                Ok(Some(v)) => {
+                    self.pop_scope();
+                    return Ok(Some(v));
+                }
+                Err(err) => {
+                    self.pop_scope();
+                    return Err(err);
+                }
+            }
+        }
+        self.pop_scope();
+        Ok(None)
+    }
+
+    pub fn push_scope(&mut self, environment: Rc<Environment>) {
+        self.environment = Some(Rc::new(Environment::new(Some(environment))));
     }
 
     pub fn pop_scope(&mut self) {
         let environment = self.environment.take();
         self.environment = if let Some(env) = environment {
-            env.enclosing
+            env.enclosing.clone()
         } else {
             None
         }
@@ -105,31 +127,32 @@ impl Visitor<InterpreterResult> for Interpreter {
     fn visit_stmt(&mut self, stmt: &Stmt) -> InterpreterResult {
         match stmt {
             Stmt::Block(block_stmt) => {
-                self.push_scope();
-                for statement in &block_stmt.statements {
-                    match self.visit_stmt(statement) {
-                        Ok(None) => (),
-                        Ok(Some(v)) => {
-                            self.pop_scope();
-                            return Ok(Some(v));
-                        }
-                        Err(err) => {
-                            self.pop_scope();
-                            return Err(err);
-                        }
-                    }
-                }
-                self.pop_scope();
-                Ok(None)
+                let environment = self.environment.take().unwrap();
+                self.execute_block(&block_stmt.statements, environment)
+                // self.push_scope();
+                // for statement in &block_stmt.statements {
+                //     match self.visit_stmt(statement) {
+                //         Ok(None) => (),
+                //         Ok(Some(v)) => {
+                //             self.pop_scope();
+                //             return Ok(Some(v));
+                //         }
+                //         Err(err) => {
+                //             self.pop_scope();
+                //             return Err(err);
+                //         }
+                //     }
+                // }
+                // self.pop_scope();
+                // Ok(None)
             }
             Stmt::Expr(expr_stmt) => {
                 self.visit_expr(&expr_stmt.expression)?;
                 Ok(None)
             }
             Stmt::Fun(fun_stmt) => {
-                let replace_me = Rc::new(crate::environment::Environment::new());
-                let fun = LoxFunction::new(fun_stmt.clone(), replace_me.clone());
-                self.define_var(fun.declaration.name.lexeme.clone(), Value::Function(fun));
+                let fun = LoxFunction::new(fun_stmt.clone(), self.environment.clone());
+                self.define_var(fun_stmt.name.lexeme.clone(), Value::Function(fun));
                 Ok(None)
             }
             Stmt::If(if_stmt) => {

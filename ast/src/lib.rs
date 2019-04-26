@@ -28,7 +28,7 @@ impl Stmt {
         Stmt::Expr(ExprStmt::new(expression))
     }
 
-    pub fn function(name: &Token, params: Vec<Token>, body: Stmt) -> Stmt {
+    pub fn function(name: &Token, params: Vec<Token>, body: Vec<Stmt>) -> Stmt {
         Stmt::Fun(FunStmt::new(name.clone(), params, body))
     }
 
@@ -91,15 +91,15 @@ impl ExprStmt {
 pub struct FunStmt {
     pub name: Token,
     pub parameters: Vec<Token>,
-    pub body: Box<Stmt>,
+    pub body: Vec<Stmt>,
 }
 
 impl FunStmt {
-    fn new(name: Token, parameters: Vec<Token>, body: Stmt) -> FunStmt {
+    fn new(name: Token, parameters: Vec<Token>, body: Vec<Stmt>) -> FunStmt {
         FunStmt {
             name,
             parameters,
-            body: Box::new(body),
+            body,
         }
     }
 }

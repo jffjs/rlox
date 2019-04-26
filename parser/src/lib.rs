@@ -114,9 +114,13 @@ fn fun_declaration<'a>(tokens: &'a Vec<Token>, mut pos: usize) -> StmtResult<'a>
                     match tokens[pos].token_type {
                         TokenType::RightParen => match tokens[pos + 1].token_type {
                             TokenType::LeftBrace => match block_statement(tokens, pos + 2) {
-                                StmtResult::Ok(body, pos) => {
-                                    StmtResult::Ok(ast::Stmt::function(name, params, body), pos)
-                                }
+                                StmtResult::Ok(body, pos) => match body {
+                                    ast::Stmt::Block(block_stmt) => StmtResult::Ok(
+                                        ast::Stmt::function(name, params, block_stmt.statements),
+                                        pos,
+                                    ),
+                                    _ => StmtResult::Err("Expect block.", pos),
+                                },
                                 StmtResult::Err(msg, pos) => StmtResult::Err(msg, pos),
                             },
                             _ => {

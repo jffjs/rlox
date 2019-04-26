@@ -134,47 +134,44 @@ impl Environment {
 
 pub mod v2 {
     use super::*;
+    use std::rc::Rc;
 
+    #[derive(Debug)]
     pub struct Environment {
-        pub enclosing: Option<Box<Environment>>,
-        values: Scope,
+        pub enclosing: Option<Rc<Environment>>,
+        values: RefCell<Scope>,
     }
 
     impl Environment {
-        pub fn new(enclosing: Option<Box<Environment>>) -> Environment {
+        pub fn new(enclosing: Option<Rc<Environment>>) -> Environment {
             Environment {
                 enclosing,
-                values: HashMap::new(),
+                values: RefCell::new(HashMap::new()),
             }
         }
 
-        pub fn define(&mut self, name: String, value: Value) {
-            self.values.insert(name, value);
+        pub fn define(&self, name: String, value: Value) {
+            self.values.borrow_mut().insert(name, value);
         }
 
-        pub fn assign(&mut self, name: String, value: Value) -> Result<(), String> {
-            if self.values.contains_key(&name) {
-                self.values.insert(name, value);
+        pub fn assign(&self, name: String, value: Value) -> Result<(), String> {
+            if self.values.borrow().contains_key(&name) {
+                self.values.borrow_mut().insert(name, value);
                 return Ok(());
             }
 
-            if let Some(enclosing) = &mut self.enclosing {
+            if let Some(enclosing) = &self.enclosing {
                 enclosing.assign(name, value)
             } else {
                 Err(format!("Undefined variable '{}'.", name))
             }
         }
 
-        pub fn assign_at(
-            &mut self,
-            name: String,
-            value: Value,
-            distance: usize,
-        ) -> Result<(), String> {
+        pub fn assign_at(&self, name: String, value: Value, distance: usize) -> Result<(), String> {
             if distance == 0 {
                 self.assign(name, value)
             } else {
-                if let Some(enclosing) = &mut self.enclosing {
+                if let Some(enclosing) = &self.enclosing {
                     enclosing.assign_at(name, value, distance - 1)
                 } else {
                     Err(format!("Undefined variable '{}'", name))
@@ -183,7 +180,7 @@ pub mod v2 {
         }
 
         pub fn get(&self, name: &String) -> Option<Value> {
-            if let Some(value) = self.values.get(name) {
+            if let Some(value) = self.values.borrow().get(name) {
                 Some(value.clone())
             } else {
                 if let Some(enclosing) = &self.enclosing {
@@ -207,10 +204,12 @@ pub mod v2 {
         }
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::v2::Environment;
     use super::*;
+    use std::rc::Rc;
 
     #[test]
     fn define_and_get() {
@@ -246,7 +245,7 @@ mod tests {
         let mut parent = Environment::new(None);
         parent.define(key.clone(), Value::Number(4.0));
 
-        let mut env = Environment::new(Some(Box::new(parent)));
+        let mut env = Environment::new(Some(Rc::new(parent)));
 
         assert_eq!(env.get(&key), Some(Value::Number(4.0)));
         env.define(key.clone(), Value::Number(5.0));
@@ -259,7 +258,7 @@ mod tests {
         let mut parent = Environment::new(None);
         parent.define(key.clone(), Value::Number(4.0));
 
-        let mut env = Environment::new(Some(Box::new(parent)));
+        let mut env = Environment::new(Some(Rc::new(parent)));
 
         assert_eq!(env.get(&key), Some(Value::Number(4.0)));
         let _result = env.assign(key.clone(), Value::Number(5.0));
@@ -272,7 +271,7 @@ mod tests {
         let mut parent = Environment::new(None);
         parent.define(key.clone(), Value::Number(4.0));
 
-        let mut env = Environment::new(Some(Box::new(parent)));
+        let mut env = Environment::new(Some(Rc::new(parent)));
 
         assert_eq!(env.get(&key), Some(Value::Number(4.0)));
         env.define(key.clone(), Value::Number(5.0));

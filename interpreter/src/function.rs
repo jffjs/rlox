@@ -1,6 +1,6 @@
 use crate::{
     callable::Callable,
-    environment::Environment,
+    environment::v2::Environment,
     interpreter::{Interpreter, InterpreterResult},
     value::Value,
 };
@@ -16,15 +16,16 @@ use std::{
 pub struct LoxFunction {
     pub declaration: ast::FunStmt,
     pub id: ProcessUniqueId,
+    pub closure: Option<Rc<Environment>>,
 }
 
 impl LoxFunction {
-    pub fn new(declaration: ast::FunStmt, env: Rc<Environment>) -> LoxFunction {
+    pub fn new(declaration: ast::FunStmt, closure: Option<Rc<Environment>>) -> LoxFunction {
         let fun = LoxFunction {
             declaration,
             id: ProcessUniqueId::new(),
+            closure,
         };
-        env.create_closure(&fun);
         fun
     }
 }
@@ -35,13 +36,12 @@ impl Callable for LoxFunction {
     }
 
     fn call(&self, int: &mut Interpreter, args: Vec<Value>) -> InterpreterResult {
-        // int.environment.push_scope_fun(self);
+        let environment = Environment::new(self.closure.clone());
         for (i, param) in self.declaration.parameters.iter().enumerate() {
-            int.define_var(param.lexeme.clone(), args[i].clone());
+            environment.define(param.lexeme.clone(), args[i].clone());
         }
 
-        let result = int.visit_stmt(&self.declaration.body);
-        // int.environment.pop_scope_fun(self);
+        let result = int.execute_block(&self.declaration.body, Rc::new(environment));
         match result {
             Ok(None) => Ok(Some(Value::Nil)),
             _ => result,
