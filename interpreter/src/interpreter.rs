@@ -114,18 +114,12 @@ impl Interpreter {
         result
     }
 
-    pub fn push_scope(&mut self, environment: Rc<Environment>) {
-        self.environment = Some(Rc::new(Environment::new(Some(environment))));
+    fn push_scope(&mut self, environment: Rc<Environment>) {
+        self.environment = Some(environment);
     }
 
-    pub fn pop_scope(&mut self, environment: Option<Rc<Environment>>) {
+    fn pop_scope(&mut self, environment: Option<Rc<Environment>>) {
         self.environment = environment;
-        // let environment = self.environment.take();
-        // self.environment = if let Some(env) = environment {
-        //     env.enclosing.clone()
-        // } else {
-        //     None
-        // }
     }
 }
 
@@ -133,8 +127,8 @@ impl Visitor<InterpreterResult> for Interpreter {
     fn visit_stmt(&mut self, stmt: &Stmt) -> InterpreterResult {
         match stmt {
             Stmt::Block(block_stmt) => {
-                let environment = self.environment.clone();
-                self.execute_block(&block_stmt.statements, environment.unwrap())
+                let environment = Environment::new(self.environment.clone());
+                self.execute_block(&block_stmt.statements, Rc::new(environment))
             }
             Stmt::Expr(expr_stmt) => {
                 self.visit_expr(&expr_stmt.expression)?;
