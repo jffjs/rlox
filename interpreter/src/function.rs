@@ -1,10 +1,9 @@
 use crate::{
     callable::Callable,
-    environment::v2::Environment,
+    environment::Environment,
     interpreter::{Interpreter, InterpreterResult},
     value::Value,
 };
-use ast::visitor::Visitor;
 use snowflake::ProcessUniqueId;
 use std::{
     fmt,

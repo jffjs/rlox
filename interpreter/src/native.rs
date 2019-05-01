@@ -1,4 +1,4 @@
-use crate::{environment::v2::Environment, function::NativeFunction, value::Value};
+use crate::{environment::Environment, function::NativeFunction, value::Value};
 use std::{
   rc::Rc,
   time::{SystemTime, UNIX_EPOCH},

@@ -1,6 +1,6 @@
 use crate::{
     callable::call,
-    environment::v2::Environment,
+    environment::Environment,
     error::{runtime_error_result, RuntimeError},
     function::LoxFunction,
     native::define_native_functions,
@@ -133,8 +133,8 @@ impl Visitor<InterpreterResult> for Interpreter {
     fn visit_stmt(&mut self, stmt: &Stmt) -> InterpreterResult {
         match stmt {
             Stmt::Block(block_stmt) => {
-                let environment = self.environment.take().unwrap();
-                self.execute_block(&block_stmt.statements, environment)
+                let environment = self.environment.clone();
+                self.execute_block(&block_stmt.statements, environment.unwrap())
             }
             Stmt::Expr(expr_stmt) => {
                 self.visit_expr(&expr_stmt.expression)?;
