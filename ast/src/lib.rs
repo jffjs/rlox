@@ -10,6 +10,7 @@ pub type ScopeId = ProcessUniqueId;
 #[derive(Clone, Debug, PartialEq)]
 pub enum Stmt {
     Block(BlockStmt),
+    Class(ClassStmt),
     Expr(ExprStmt),
     Fun(FunStmt),
     If(IfStmt),
@@ -22,6 +23,10 @@ pub enum Stmt {
 impl Stmt {
     pub fn block(statements: Vec<Stmt>) -> Stmt {
         Stmt::Block(BlockStmt::new(statements))
+    }
+
+    pub fn class(name: &Token, methods: Vec<FunStmt>) -> Stmt {
+        Stmt::Class(ClassStmt::new(name.clone(), methods))
     }
 
     pub fn expr(expression: Expr) -> Stmt {
@@ -73,6 +78,18 @@ pub struct BlockStmt {
 impl BlockStmt {
     fn new(statements: Vec<Stmt>) -> BlockStmt {
         BlockStmt { statements }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClassStmt {
+    pub name: Token,
+    pub methods: Vec<FunStmt>,
+}
+
+impl ClassStmt {
+    fn new(name: Token, methods: Vec<FunStmt>) -> ClassStmt {
+        ClassStmt { name, methods }
     }
 }
 

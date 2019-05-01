@@ -152,6 +152,7 @@ impl Visitor<ResolverResult> for Resolver {
                 }
                 self.define(&var_stmt.name);
             }
+            _ => unimplemented!(),
         }
         Ok(())
     }

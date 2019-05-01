@@ -186,6 +186,7 @@ impl Visitor<InterpreterResult> for Interpreter {
                 }
                 Ok(None)
             }
+            _ => unimplemented!()
         }
     }
 

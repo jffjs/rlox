@@ -7,15 +7,31 @@ use ast::token::{Literal, Token, TokenType};
 use std::error::Error;
 use std::fmt;
 
-enum StmtResult<'a> {
-    Ok(ast::Stmt, usize),
+// enum StmtResult<'a> {
+//     Ok(ast::Stmt, usize),
 
-    Err(&'a str, usize),
-}
+//     Err(&'a str, usize),
+// }
 
 enum ExprResult<'a> {
     Ok(ast::Expr, usize),
     Err(&'a str, usize),
+}
+
+type StmtResult = Result<(ast::Stmt, usize), (&'static str, usize)>;
+type ConsumeResult<'a> = Result<(&'a Token, usize), &'a str>;
+
+fn consume<'a>(
+    tokens: &'a Vec<Token>,
+    pos: usize,
+    expect: TokenType,
+    err_msg: &'a str,
+) -> ConsumeResult<'a> {
+    if tokens[pos].token_type == expect {
+        Ok((&tokens[pos], pos + 1))
+    } else {
+        Err(err_msg)
+    }
 }
 
 pub fn parse(source: String) -> Result<Vec<ast::Stmt>, Vec<Box<Error>>> {
@@ -26,11 +42,11 @@ pub fn parse(source: String) -> Result<Vec<ast::Stmt>, Vec<Box<Error>>> {
     let mut pos = 0;
     while tokens[pos].token_type != TokenType::Eof {
         match declaration(&tokens, pos) {
-            StmtResult::Ok(stmt, next_pos) => {
+            Ok((stmt, next_pos)) => {
                 statements.push(stmt);
                 pos = next_pos;
             }
-            StmtResult::Err(msg, mut next_pos) => {
+            Err((msg, mut next_pos)) => {
                 let token = &tokens[next_pos];
                 let error = ParseError::new(token.line, token.lexeme.clone(), String::from(msg));
                 errors.push(Box::new(error));
@@ -77,13 +93,18 @@ pub fn parse(source: String) -> Result<Vec<ast::Stmt>, Vec<Box<Error>>> {
 
 fn declaration(tokens: &Vec<Token>, pos: usize) -> StmtResult {
     match tokens[pos].token_type {
+        // TokenType::Class => class_declaration(tokens, pos + 1),
         TokenType::Fun => fun_declaration(tokens, pos + 1),
         TokenType::Var => var_declaration(tokens, pos + 1),
         _ => statement(tokens, pos),
     }
 }
 
-fn fun_declaration<'a>(tokens: &'a Vec<Token>, mut pos: usize) -> StmtResult<'a> {
+// fn class_declaration(tokens: & Vec<Token>, pos: usize) -> StmtResult {
+//     let (name, pos) = consume(tokens, pos, TokenType::Identifier, "Expect class name.")?;
+// }
+
+fn fun_declaration<'a>(tokens: &'a Vec<Token>, mut pos: usize) -> StmtResult {
     match tokens[pos].token_type {
         TokenType::Identifier => {
             let name = &tokens[pos];
@@ -95,12 +116,12 @@ fn fun_declaration<'a>(tokens: &'a Vec<Token>, mut pos: usize) -> StmtResult<'a>
                     if !check_token(&tokens[pos], TokenType::RightParen) {
                         loop {
                             if params.len() >= 8 {
-                                return StmtResult::Err("Cannot have more than 8 arguments.", pos);
+                                return Err(("Cannot have more than 8 arguments.", pos));
                             }
 
                             match tokens[pos].token_type {
                                 TokenType::Identifier => params.push(tokens[pos].clone()),
-                                _ => return StmtResult::Err("Expect parameter name.", pos),
+                                _ => return Err(("Expect parameter name.", pos)),
                             };
 
                             pos += 1;
@@ -114,26 +135,24 @@ fn fun_declaration<'a>(tokens: &'a Vec<Token>, mut pos: usize) -> StmtResult<'a>
                     match tokens[pos].token_type {
                         TokenType::RightParen => match tokens[pos + 1].token_type {
                             TokenType::LeftBrace => match block_statement(tokens, pos + 2) {
-                                StmtResult::Ok(body, pos) => match body {
-                                    ast::Stmt::Block(block_stmt) => StmtResult::Ok(
+                                Ok((body, pos)) => match body {
+                                    ast::Stmt::Block(block_stmt) => Ok((
                                         ast::Stmt::function(name, params, block_stmt.statements),
                                         pos,
-                                    ),
-                                    _ => StmtResult::Err("Expect block.", pos),
+                                    )),
+                                    _ => Err(("Expect block.", pos)),
                                 },
-                                StmtResult::Err(msg, pos) => StmtResult::Err(msg, pos),
+                                Err(err) => Err(err),
                             },
-                            _ => {
-                                StmtResult::Err("Expect '{{' before function or method body.", pos)
-                            }
+                            _ => Err(("Expect '{{' before function or method body.", pos)),
                         },
-                        _ => StmtResult::Err("Expect ')' after parameters.", pos),
+                        _ => Err(("Expect ')' after parameters.", pos)),
                     }
                 }
-                _ => StmtResult::Err("Expect '(' after function or method name.", pos),
+                _ => Err(("Expect '(' after function or method name.", pos)),
             }
         }
-        _ => StmtResult::Err("Expect function or method name.", pos),
+        _ => Err(("Expect function or method name.", pos)),
     }
 }
 
@@ -146,23 +165,23 @@ fn var_declaration(tokens: &Vec<Token>, mut pos: usize) -> StmtResult {
                 ExprResult::Ok(initializer, pos) => {
                     if match_type(&tokens[pos], vec![TokenType::Semicolon]) {
                         let stmt = ast::Stmt::var_init(name, initializer);
-                        StmtResult::Ok(stmt, pos + 1)
+                        Ok((stmt, pos + 1))
                     } else {
-                        StmtResult::Err("Expect ';' after variable declaration.", pos)
+                        Err(("Expect ';' after variable declaration.", pos))
                     }
                 }
-                ExprResult::Err(msg, pos) => StmtResult::Err(msg, pos),
+                ExprResult::Err(msg, pos) => Err((msg, pos)),
             }
         } else {
             if match_type(&tokens[pos], vec![TokenType::Semicolon]) {
                 let stmt = ast::Stmt::var(name);
-                StmtResult::Ok(stmt, pos + 1)
+                Ok((stmt, pos + 1))
             } else {
-                StmtResult::Err("Expect ';' after variable declaration.", pos)
+                Err(("Expect ';' after variable declaration.", pos))
             }
         }
     } else {
-        StmtResult::Err("Expect variable name.", pos)
+        Err(("Expect variable name.", pos))
     }
 }
 
@@ -183,23 +202,23 @@ fn if_statement(tokens: &Vec<Token>, pos: usize) -> StmtResult {
         TokenType::LeftParen => match expression(tokens, pos + 1) {
             ExprResult::Ok(condition, pos) => match tokens[pos].token_type {
                 TokenType::RightParen => match statement(tokens, pos + 1) {
-                    StmtResult::Ok(then_branch, pos) => match tokens[pos].token_type {
+                    Ok((then_branch, pos)) => match tokens[pos].token_type {
                         TokenType::Else => match statement(tokens, pos + 1) {
-                            StmtResult::Ok(else_branch, pos) => StmtResult::Ok(
+                            Ok((else_branch, pos)) => Ok((
                                 ast::Stmt::if_then_else(condition, then_branch, else_branch),
                                 pos,
-                            ),
-                            StmtResult::Err(msg, pos) => StmtResult::Err(msg, pos),
+                            )),
+                            Err(err) => Err(err),
                         },
-                        _ => StmtResult::Ok(ast::Stmt::if_then(condition, then_branch), pos),
+                        _ => Ok((ast::Stmt::if_then(condition, then_branch), pos)),
                     },
-                    StmtResult::Err(msg, pos) => StmtResult::Err(msg, pos),
+                    Err(err) => Err(err),
                 },
-                _ => StmtResult::Err("Expect ')' after if condition.", pos),
+                _ => Err(("Expect ')' after if condition.", pos)),
             },
-            ExprResult::Err(msg, pos) => StmtResult::Err(msg, pos),
+            ExprResult::Err(msg, pos) => Err((msg, pos)),
         },
-        _ => StmtResult::Err("Expect '(' after 'if'.", pos),
+        _ => Err(("Expect '(' after 'if'.", pos)),
     }
 }
 
