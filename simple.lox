@@ -1,21 +1,9 @@
-var a = 1;
-var b = 2;
-print a;
-print b;
-
-fun foo() {
-  var a = 0;
-  fun bar() {
-    a = a + 1;
-    print a;
+fun foo(i) {
+  print i;
+  if (i >= 8) {
+    return "done";
   }
-  return bar;
+  return foo(i+1);
 }
 
-var bar = foo();
-bar();
-bar();
-bar();
-bar();
-bar();
-bar();
+print foo(0);

@@ -56,16 +56,19 @@ impl Interpreter {
     }
 
     fn look_up_var(&mut self, name: &String, scope_id: &ScopeId) -> Option<Value> {
-        let environment = self.environment.take().unwrap();
-        let value;
-        if let Some(distance) = self.resolver.locals.get(scope_id) {
-            println!("{}", distance);
-            value = environment.get_at(name, *distance)
+        if let Some(environment) = self.environment.take() {
+            let value;
+            if let Some(distance) = self.resolver.locals.get(scope_id) {
+                // println!("{}", distance);
+                value = environment.get_at(name, *distance)
+            } else {
+                value = environment.get(name)
+            }
+            self.environment = Some(environment);
+            value
         } else {
-            value = environment.get(name)
+            None
         }
-        self.environment = Some(environment);
-        value
     }
 
     fn assign_var(&mut self, name: String, value: Value, scope_id: &ScopeId) -> Result<(), String> {
@@ -91,35 +94,38 @@ impl Interpreter {
         statements: &Vec<Stmt>,
         environment: Rc<Environment>,
     ) -> InterpreterResult {
+        let previous = self.environment.take();
         self.push_scope(environment);
+        let mut result: InterpreterResult = Ok(None);
         for statement in statements {
             match self.visit_stmt(statement) {
                 Ok(None) => (),
                 Ok(Some(v)) => {
-                    self.pop_scope();
-                    return Ok(Some(v));
+                    result = Ok(Some(v));
+                    break;
                 }
                 Err(err) => {
-                    self.pop_scope();
-                    return Err(err);
+                    result = Err(err);
+                    break;
                 }
             }
         }
-        self.pop_scope();
-        Ok(None)
+        self.pop_scope(previous);
+        result
     }
 
     pub fn push_scope(&mut self, environment: Rc<Environment>) {
         self.environment = Some(Rc::new(Environment::new(Some(environment))));
     }
 
-    pub fn pop_scope(&mut self) {
-        let environment = self.environment.take();
-        self.environment = if let Some(env) = environment {
-            env.enclosing.clone()
-        } else {
-            None
-        }
+    pub fn pop_scope(&mut self, environment: Option<Rc<Environment>>) {
+        self.environment = environment;
+        // let environment = self.environment.take();
+        // self.environment = if let Some(env) = environment {
+        //     env.enclosing.clone()
+        // } else {
+        //     None
+        // }
     }
 }
 
@@ -129,22 +135,6 @@ impl Visitor<InterpreterResult> for Interpreter {
             Stmt::Block(block_stmt) => {
                 let environment = self.environment.take().unwrap();
                 self.execute_block(&block_stmt.statements, environment)
-                // self.push_scope();
-                // for statement in &block_stmt.statements {
-                //     match self.visit_stmt(statement) {
-                //         Ok(None) => (),
-                //         Ok(Some(v)) => {
-                //             self.pop_scope();
-                //             return Ok(Some(v));
-                //         }
-                //         Err(err) => {
-                //             self.pop_scope();
-                //             return Err(err);
-                //         }
-                //     }
-                // }
-                // self.pop_scope();
-                // Ok(None)
             }
             Stmt::Expr(expr_stmt) => {
                 self.visit_expr(&expr_stmt.expression)?;

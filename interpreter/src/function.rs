@@ -41,11 +41,7 @@ impl Callable for LoxFunction {
             environment.define(param.lexeme.clone(), args[i].clone());
         }
 
-        let result = int.execute_block(&self.declaration.body, Rc::new(environment));
-        match result {
-            Ok(None) => Ok(Some(Value::Nil)),
-            _ => result,
-        }
+        int.execute_block(&self.declaration.body, Rc::new(environment))
     }
 }
 
