@@ -59,7 +59,6 @@ impl Interpreter {
         if let Some(environment) = self.environment.take() {
             let value;
             if let Some(distance) = self.resolver.locals.get(scope_id) {
-                // println!("{}", distance);
                 value = environment.get_at(name, *distance)
             } else {
                 value = environment.get(name)

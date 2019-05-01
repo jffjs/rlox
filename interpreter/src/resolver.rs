@@ -1,11 +1,15 @@
 use crate::error::ResolverError;
-use ast::{visitor::Visitor, Expr, FunStmt, ScopeId, Stmt};
+use ast::{token::Token, visitor::Visitor, Expr, FunStmt, ScopeId, Stmt};
 use std::collections::HashMap;
 
 type Scope = HashMap<String, bool>;
 type ResolverResult = Result<(), ResolverError>;
+enum FunType {
+    Function,
+}
 
 pub struct Resolver {
+    current_fun: Option<FunType>,
     scopes: Vec<Scope>,
     pub locals: HashMap<ScopeId, usize>,
 }
@@ -13,6 +17,7 @@ pub struct Resolver {
 impl Resolver {
     pub fn new() -> Resolver {
         Resolver {
+            current_fun: None,
             scopes: vec![],
             locals: HashMap::new(),
         }
@@ -44,17 +49,19 @@ impl Resolver {
         self.visit_expr(expr)
     }
 
-    fn resolve_function(&mut self, function: &FunStmt) -> ResolverResult {
+    fn resolve_function(&mut self, function: &FunStmt, fun_type: FunType) -> ResolverResult {
+        let enclosing_fun = self.current_fun.take();
+        self.current_fun = Some(fun_type);
         self.push_scope();
         for param in &function.parameters {
-            let name = &param.lexeme;
-            self.declare(name.clone());
-            self.define(name.clone());
+            self.declare(&param)?;
+            self.define(&param);
         }
         for statement in &function.body {
             self.resolve_stmt(&statement)?;
         }
         self.pop_scope();
+        self.current_fun = enclosing_fun;
         Ok(())
     }
 
@@ -66,15 +73,22 @@ impl Resolver {
         self.scopes.pop();
     }
 
-    fn declare(&mut self, name: String) {
+    fn declare(&mut self, token: &Token) -> ResolverResult {
         if let Some(scope) = self.scopes.last_mut() {
-            scope.insert(name, false);
+            if scope.contains_key(&token.lexeme) {
+                return Err(ResolverError::new(
+                    token.line,
+                    "Variable with this name already declared in this scope.".to_string(),
+                ));
+            }
+            scope.insert(token.lexeme.clone(), false);
         }
+        Ok(())
     }
 
-    fn define(&mut self, name: String) {
+    fn define(&mut self, token: &Token) {
         if let Some(scope) = self.scopes.last_mut() {
-            scope.insert(name, true);
+            scope.insert(token.lexeme.clone(), true);
         }
     }
 
@@ -103,10 +117,9 @@ impl Visitor<ResolverResult> for Resolver {
             }
             Stmt::Expr(expr_stmt) => self.resolve_expr(&expr_stmt.expression)?,
             Stmt::Fun(fun_stmt) => {
-                let name = &fun_stmt.name.lexeme;
-                self.declare(name.clone());
-                self.define(name.clone());
-                self.resolve_function(fun_stmt)?;
+                self.declare(&fun_stmt.name)?;
+                self.define(&fun_stmt.name);
+                self.resolve_function(fun_stmt, FunType::Function)?;
             }
             Stmt::If(if_stmt) => {
                 self.resolve_expr(&if_stmt.condition)?;
@@ -117,6 +130,13 @@ impl Visitor<ResolverResult> for Resolver {
             }
             Stmt::Print(print_stmt) => self.resolve_expr(&print_stmt.expression)?,
             Stmt::Return(return_stmt) => {
+                if let None = self.current_fun {
+                    return Err(ResolverError::new(
+                        return_stmt.keyword.line,
+                        "Cannot return from top-level code.".to_string(),
+                    ));
+                }
+
                 if let Some(value) = &return_stmt.value {
                     self.resolve_expr(value)?;
                 }
@@ -126,12 +146,11 @@ impl Visitor<ResolverResult> for Resolver {
                 self.resolve_stmt(&while_stmt.body)?;
             }
             Stmt::Var(var_stmt) => {
-                let name = &var_stmt.name.lexeme;
-                self.declare(name.clone());
+                self.declare(&var_stmt.name)?;
                 if let Some(initializer) = &var_stmt.initializer {
                     self.resolve_expr(initializer)?;
                 }
-                self.define(name.clone());
+                self.define(&var_stmt.name);
             }
         }
         Ok(())
