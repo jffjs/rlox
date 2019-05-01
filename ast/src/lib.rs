@@ -1,5 +1,11 @@
+pub mod token;
+pub mod visitor;
+
+use crate::token::{Literal, Token};
+use snowflake::ProcessUniqueId;
 use std::fmt;
-use token::{Literal, Token};
+
+pub type ScopeId = ProcessUniqueId;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Stmt {
@@ -10,7 +16,7 @@ pub enum Stmt {
     Print(PrintStmt),
     Return(ReturnStmt),
     Var(VarStmt),
-    While(WhileStmt)
+    While(WhileStmt),
 }
 
 impl Stmt {
@@ -22,7 +28,7 @@ impl Stmt {
         Stmt::Expr(ExprStmt::new(expression))
     }
 
-    pub fn function(name: &Token, params: Vec<Token>, body: Stmt) -> Stmt {
+    pub fn function(name: &Token, params: Vec<Token>, body: Vec<Stmt>) -> Stmt {
         Stmt::Fun(FunStmt::new(name.clone(), params, body))
     }
 
@@ -31,7 +37,11 @@ impl Stmt {
     }
 
     pub fn if_then_else(condition: Expr, then_branch: Stmt, else_branch: Stmt) -> Stmt {
-        Stmt::If(IfStmt::new(condition, then_branch, Some(Box::new(else_branch))))
+        Stmt::If(IfStmt::new(
+            condition,
+            then_branch,
+            Some(Box::new(else_branch)),
+        ))
     }
 
     pub fn print(expression: Expr) -> Stmt {
@@ -57,7 +67,7 @@ impl Stmt {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct BlockStmt {
-    pub statements: Vec<Stmt>
+    pub statements: Vec<Stmt>,
 }
 
 impl BlockStmt {
@@ -68,7 +78,7 @@ impl BlockStmt {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprStmt {
-    pub expression: Expr
+    pub expression: Expr,
 }
 
 impl ExprStmt {
@@ -81,12 +91,16 @@ impl ExprStmt {
 pub struct FunStmt {
     pub name: Token,
     pub parameters: Vec<Token>,
-    pub body: Box<Stmt>
+    pub body: Vec<Stmt>,
 }
 
 impl FunStmt {
-    fn new(name: Token, parameters: Vec<Token>, body: Stmt) -> FunStmt {
-        FunStmt { name, parameters, body: Box::new(body) }
+    fn new(name: Token, parameters: Vec<Token>, body: Vec<Stmt>) -> FunStmt {
+        FunStmt {
+            name,
+            parameters,
+            body,
+        }
     }
 }
 
@@ -94,18 +108,22 @@ impl FunStmt {
 pub struct IfStmt {
     pub condition: Expr,
     pub then_branch: Box<Stmt>,
-    pub else_branch: Option<Box<Stmt>>
+    pub else_branch: Option<Box<Stmt>>,
 }
 
 impl IfStmt {
     fn new(condition: Expr, then_branch: Stmt, else_branch: Option<Box<Stmt>>) -> IfStmt {
-        IfStmt { condition, then_branch: Box::new(then_branch), else_branch }
+        IfStmt {
+            condition,
+            then_branch: Box::new(then_branch),
+            else_branch,
+        }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PrintStmt {
-    pub expression: Expr
+    pub expression: Expr,
 }
 
 impl PrintStmt {
@@ -117,7 +135,7 @@ impl PrintStmt {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ReturnStmt {
     pub keyword: Token,
-    pub value: Option<Expr>
+    pub value: Option<Expr>,
 }
 
 impl ReturnStmt {
@@ -129,7 +147,7 @@ impl ReturnStmt {
 #[derive(Clone, Debug, PartialEq)]
 pub struct VarStmt {
     pub name: Token,
-    pub initializer: Option<Expr>
+    pub initializer: Option<Expr>,
 }
 
 impl VarStmt {
@@ -141,12 +159,15 @@ impl VarStmt {
 #[derive(Clone, Debug, PartialEq)]
 pub struct WhileStmt {
     pub condition: Expr,
-    pub body: Box<Stmt>
+    pub body: Box<Stmt>,
 }
 
 impl WhileStmt {
     fn new(condition: Expr, body: Stmt) -> WhileStmt {
-        WhileStmt { condition, body: Box::new(body) }
+        WhileStmt {
+            condition,
+            body: Box::new(body),
+        }
     }
 }
 
@@ -159,7 +180,7 @@ pub enum Expr {
     Literal(LiteralExpr),
     Logical(LogicalExpr),
     Unary(UnaryExpr),
-    Variable(VariableExpr)
+    Variable(VariableExpr),
 }
 
 impl fmt::Display for Expr {
@@ -167,28 +188,38 @@ impl fmt::Display for Expr {
         match self {
             &Expr::Assign(ref assign_expr) => {
                 write!(f, "(= {} {})", assign_expr.name.lexeme, assign_expr.value)
-            },
-            &Expr::Binary(ref bin_expr) => {
-                write!(f, "{}", parenthesize(&bin_expr.operator.lexeme, vec![&bin_expr.left, &bin_expr.right]))
-            },
-            &Expr::Call(ref call_expr) => {
-                write!(f, "{}", parenthesize_call(&call_expr.callee.to_string(), &call_expr.arguments))
-            },
+            }
+            &Expr::Binary(ref bin_expr) => write!(
+                f,
+                "{}",
+                parenthesize(
+                    &bin_expr.operator.lexeme,
+                    vec![&bin_expr.left, &bin_expr.right]
+                )
+            ),
+            &Expr::Call(ref call_expr) => write!(
+                f,
+                "{}",
+                parenthesize_call(&call_expr.callee.to_string(), &call_expr.arguments)
+            ),
             &Expr::Grouping(ref group_expr) => {
                 write!(f, "{}", parenthesize("group", vec![&group_expr.expression]))
-            },
-            &Expr::Literal(ref lit_expr) => {
-                write!(f, "{}", &lit_expr.value.to_string())
-            },
-            &Expr::Logical(ref log_expr) => {
-                write!(f, "{}", parenthesize(&log_expr.operator.lexeme, vec![&log_expr.left, &log_expr.right]))
-            },
-            &Expr::Unary(ref unary_expr) => {
-                write!(f, "{}", parenthesize(&unary_expr.operator.lexeme, vec![&unary_expr.right]))
-            },
-            &Expr::Variable(ref var_expr) => {
-                write!(f, "{}", &var_expr.name.lexeme)
             }
+            &Expr::Literal(ref lit_expr) => write!(f, "{}", &lit_expr.value.to_string()),
+            &Expr::Logical(ref log_expr) => write!(
+                f,
+                "{}",
+                parenthesize(
+                    &log_expr.operator.lexeme,
+                    vec![&log_expr.left, &log_expr.right]
+                )
+            ),
+            &Expr::Unary(ref unary_expr) => write!(
+                f,
+                "{}",
+                parenthesize(&unary_expr.operator.lexeme, vec![&unary_expr.right])
+            ),
+            &Expr::Variable(ref var_expr) => write!(f, "{}", &var_expr.name.lexeme),
         }
     }
 }
@@ -214,7 +245,6 @@ fn parenthesize_call(callee: &str, args: &Vec<Expr>) -> String {
     result.push_str(")");
     result
 }
-
 
 impl Expr {
     pub fn assign(name: &Token, value: Expr) -> Expr {
@@ -253,12 +283,17 @@ impl Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct AssignExpr {
     pub name: Token,
-    pub value: Box<Expr>
+    pub value: Box<Expr>,
+    pub scope_id: ScopeId,
 }
 
 impl AssignExpr {
     pub fn new(name: Token, value: Expr) -> AssignExpr {
-        AssignExpr { name, value: Box::new(value) }
+        AssignExpr {
+            name,
+            value: Box::new(value),
+            scope_id: ScopeId::new(),
+        }
     }
 }
 
@@ -266,12 +301,16 @@ impl AssignExpr {
 pub struct BinaryExpr {
     pub left: Box<Expr>,
     pub operator: Token,
-    pub right: Box<Expr>
+    pub right: Box<Expr>,
 }
 
 impl BinaryExpr {
     fn new(left: Expr, operator: Token, right: Expr) -> BinaryExpr {
-        BinaryExpr { left: Box::new(left), operator, right: Box::new(right) }
+        BinaryExpr {
+            left: Box::new(left),
+            operator,
+            right: Box::new(right),
+        }
     }
 }
 
@@ -279,29 +318,35 @@ impl BinaryExpr {
 pub struct CallExpr {
     pub callee: Box<Expr>,
     pub paren: Token,
-    pub arguments: Vec<Expr>
+    pub arguments: Vec<Expr>,
 }
 
 impl CallExpr {
     fn new(callee: Expr, paren: Token, arguments: Vec<Expr>) -> CallExpr {
-        CallExpr { callee: Box::new(callee), paren, arguments }
+        CallExpr {
+            callee: Box::new(callee),
+            paren,
+            arguments,
+        }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct GroupingExpr {
-    pub expression: Box<Expr>
+    pub expression: Box<Expr>,
 }
 
 impl GroupingExpr {
     pub fn new(expression: Expr) -> GroupingExpr {
-        GroupingExpr { expression: Box::new(expression) }
+        GroupingExpr {
+            expression: Box::new(expression),
+        }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct LiteralExpr {
-    pub value: Literal
+    pub value: Literal,
 }
 
 impl LiteralExpr {
@@ -314,34 +359,59 @@ impl LiteralExpr {
 pub struct LogicalExpr {
     pub left: Box<Expr>,
     pub operator: Token,
-    pub right: Box<Expr>
+    pub right: Box<Expr>,
 }
 
 impl LogicalExpr {
     fn new(left: Expr, operator: Token, right: Expr) -> LogicalExpr {
-        LogicalExpr { left: Box::new(left), operator, right: Box::new(right) }
+        LogicalExpr {
+            left: Box::new(left),
+            operator,
+            right: Box::new(right),
+        }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct UnaryExpr {
     pub operator: Token,
-    pub right: Box<Expr>
+    pub right: Box<Expr>,
 }
 
 impl UnaryExpr {
     fn new(operator: Token, right: Expr) -> UnaryExpr {
-        UnaryExpr { operator, right: Box::new(right) }
+        UnaryExpr {
+            operator,
+            right: Box::new(right),
+        }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct VariableExpr {
-    pub name: Token
+    pub name: Token,
+    pub scope_id: ScopeId,
 }
 
 impl VariableExpr {
     fn new(name: Token) -> VariableExpr {
-        VariableExpr { name }
+        VariableExpr {
+            name,
+            scope_id: ScopeId::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::token::TokenType;
+
+    #[test]
+    fn scope_id() {
+        let token = Token::new(TokenType::Identifier, "foo".to_string(), None, 1);
+        let expr = VariableExpr::new(token);
+
+        assert_eq!(expr, expr.clone());
     }
 }

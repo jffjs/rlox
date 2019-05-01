@@ -1,65 +1,6 @@
-mod scanner;
-mod parser;
-mod token;
-mod ast;
-mod eval;
-mod env;
-
-use std::error::Error;
-use std::fmt;
-use env::Environment;
+use interpreter::Interpreter;
 use parser::parse;
-use scanner::Scanner;
-
-pub struct Interpreter {
-    env: Environment
-}
-
-impl Interpreter {
-    pub fn new() -> Interpreter {
-        Interpreter { env: Environment::new() }
-    }
-
-    pub fn run(&mut self, source: String) -> Result<(), LoxError> {
-        let scanner = Scanner::new(source);
-
-        match scanner.scan_tokens() {
-            Err(errors) => {
-                Interpreter::report_errors(errors);
-                Err(LoxError)
-            },
-            Ok(tokens) => {
-                let mut errors: Vec<Box<Error>> = vec![];
-                match parse(&tokens) {
-                    Ok(statements) => {
-                        for statement in statements {
-                            match statement.execute(&mut self.env) {
-                                Ok(_) => (),
-                                Err(error) => errors.push(Box::new(error))
-                            }
-                        }
-                        if errors.len() > 0 {
-                            Interpreter::report_errors(errors);
-                            Err(LoxError)
-                        } else {
-                            Ok(())
-                        }
-                    },
-                    Err(errors) => {
-                        Interpreter::report_errors(errors);
-                        Err(LoxError)
-                    }
-                }
-            }
-        }
-    }
-
-    fn report_errors(errors: Vec<Box<Error>>) {
-        for error in errors.iter() {
-            println!("{}", error);
-        }
-    }
-}
+use std::{error::Error, fmt};
 
 #[derive(Debug)]
 pub struct LoxError;
@@ -80,3 +21,36 @@ impl Error for LoxError {
     }
 }
 
+pub struct Repl {
+    interpreter: Interpreter,
+}
+
+impl Repl {
+    pub fn new() -> Repl {
+        Repl {
+            interpreter: Interpreter::new(),
+        }
+    }
+
+    pub fn run(&mut self, source: String) -> Result<(), LoxError> {
+        match parse(source) {
+            Ok(program) => match self.interpreter.run(program) {
+                Ok(_) => Ok(()),
+                Err(errors) => {
+                    report_errors(errors);
+                    Err(LoxError)
+                }
+            },
+            Err(errors) => {
+                report_errors(errors);
+                Err(LoxError)
+            }
+        }
+    }
+}
+
+fn report_errors(errors: Vec<Box<Error>>) {
+    for error in errors {
+        println!("{}", error);
+    }
+}

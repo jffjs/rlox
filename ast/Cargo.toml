@@ -1,0 +1,8 @@
+[package]
+name = "ast"
+version = "0.1.0"
+authors = ["Jeff Smith <jffreyjs@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+snowflake = "1.2"

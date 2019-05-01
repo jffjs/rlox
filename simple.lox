@@ -1,0 +1,9 @@
+fun foo(i) {
+  print i;
+  if (i >= 8) {
+    return "done";
+  }
+  return foo(i+1);
+}
+
+print foo(0);
