@@ -20,13 +20,13 @@ use std::fmt;
 
 type StmtResult = Result<(ast::Stmt, usize), (&'static str, usize)>;
 type ExprResult = Result<(ast::Expr, usize), (&'static str, usize)>;
-type ConsumeResult<'a> = Result<(&'a Token, usize), &'a str>;
+type ConsumeResult<'a> = Result<(&'a Token, usize), &'static str>;
 
 fn consume<'a>(
     tokens: &'a Vec<Token>,
     pos: usize,
     expect: TokenType,
-    err_msg: &'a str,
+    err_msg: &'static str,
 ) -> ConsumeResult<'a> {
     if tokens[pos].token_type == expect {
         Ok((&tokens[pos], pos + 1))
@@ -162,16 +162,12 @@ fn var_declaration(tokens: &Vec<Token>, mut pos: usize) -> StmtResult {
         let name = &tokens[pos];
         pos += 1;
         if match_type(&tokens[pos], vec![TokenType::Equal]) {
-            match expression(tokens, pos + 1) {
-                Ok((initializer, pos)) => {
-                    if match_type(&tokens[pos], vec![TokenType::Semicolon]) {
-                        let stmt = ast::Stmt::var_init(name, initializer);
-                        Ok((stmt, pos + 1))
-                    } else {
-                        Err(("Expect ';' after variable declaration.", pos))
-                    }
-                }
-                Err(err) => Err(err),
+            let (initializer, pos) = expression(tokens, pos + 1)?;
+            if match_type(&tokens[pos], vec![TokenType::Semicolon]) {
+                let stmt = ast::Stmt::var_init(name, initializer);
+                Ok((stmt, pos + 1))
+            } else {
+                Err(("Expect ';' after variable declaration.", pos))
             }
         } else {
             if match_type(&tokens[pos], vec![TokenType::Semicolon]) {
