@@ -115,6 +115,10 @@ impl Visitor<ResolverResult> for Resolver {
                 }
                 self.pop_scope();
             }
+            Stmt::Class(class_stmt) => {
+                self.declare(&class_stmt.name)?;
+                self.define(&class_stmt.name);
+            }
             Stmt::Expr(expr_stmt) => self.resolve_expr(&expr_stmt.expression)?,
             Stmt::Fun(fun_stmt) => {
                 self.declare(&fun_stmt.name)?;
@@ -152,7 +156,7 @@ impl Visitor<ResolverResult> for Resolver {
                 }
                 self.define(&var_stmt.name);
             }
-            _ => unimplemented!(),
+            // _ => unimplemented!(),
         }
         Ok(())
     }

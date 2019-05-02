@@ -23,9 +23,9 @@ type ExprResult = Result<(ast::Expr, usize), (&'static str, usize)>;
 type ConsumeResult<'a> = Result<(&'a Token, usize), &'static str>;
 
 fn consume<'a>(
+    expect: TokenType,
     tokens: &'a Vec<Token>,
     pos: usize,
-    expect: TokenType,
     err_msg: &'static str,
 ) -> ConsumeResult<'a> {
     if tokens[pos].token_type == expect {
@@ -94,16 +94,41 @@ pub fn parse(source: String) -> Result<Vec<ast::Stmt>, Vec<Box<Error>>> {
 
 fn declaration(tokens: &Vec<Token>, pos: usize) -> StmtResult {
     match tokens[pos].token_type {
-        // TokenType::Class => class_declaration(tokens, pos + 1),
+        TokenType::Class => class_declaration(tokens, pos + 1),
         TokenType::Fun => fun_declaration(tokens, pos + 1),
         TokenType::Var => var_declaration(tokens, pos + 1),
         _ => statement(tokens, pos),
     }
 }
 
-// fn class_declaration(tokens: & Vec<Token>, pos: usize) -> StmtResult {
-//     let (name, pos) = consume(tokens, pos, TokenType::Identifier, "Expect class name.")?;
-// }
+fn class_declaration(tokens: &Vec<Token>, pos: usize) -> StmtResult {
+    let (name, pos) = consume(TokenType::Identifier, tokens, pos, "Expect class name.")
+        .map_err(|msg| (msg, pos))?;
+    let (_, mut pos) = consume(
+        TokenType::LeftBrace,
+        tokens,
+        pos,
+        "Expect '{' before class body.",
+    )
+    .map_err(|msg| (msg, pos))?;
+    let mut methods: Vec<ast::FunStmt> = Vec::new();
+    while !check_token(&tokens[pos], TokenType::RightBrace) {
+        let (stmt, next_pos) = fun_declaration(tokens, pos)?;
+        pos = next_pos;
+        if let ast::Stmt::Fun(fun) = stmt {
+            methods.push(fun);
+        }
+    }
+    let (_, pos) = consume(
+        TokenType::RightBrace,
+        tokens,
+        pos,
+        "Expect '}' after class body.",
+    )
+    .map_err(|msg| (msg, pos))?;
+
+    Ok((ast::Stmt::class(name, methods), pos))
+}
 
 fn fun_declaration<'a>(tokens: &'a Vec<Token>, mut pos: usize) -> StmtResult {
     match tokens[pos].token_type {

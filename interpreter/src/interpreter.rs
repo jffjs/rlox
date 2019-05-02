@@ -1,5 +1,6 @@
 use crate::{
     callable::call,
+    class::LoxClass,
     environment::Environment,
     error::{runtime_error_result, RuntimeError},
     function::LoxFunction,
@@ -70,11 +71,20 @@ impl Interpreter {
         }
     }
 
-    fn assign_var(&mut self, name: String, value: Value, scope_id: &ScopeId) -> Result<(), String> {
+    fn assign_var(
+        &mut self,
+        name: String,
+        value: Value,
+        scope_id: Option<&ScopeId>,
+    ) -> Result<(), String> {
         let environment = self.environment.take().unwrap();
         let result;
-        if let Some(distance) = self.resolver.locals.get(scope_id) {
-            result = environment.assign_at(name, value, *distance);
+        if let Some(scope_id) = scope_id {
+            if let Some(distance) = self.resolver.locals.get(scope_id) {
+                result = environment.assign_at(name, value, *distance);
+            } else {
+                result = environment.assign(name, value);
+            }
         } else {
             result = environment.assign(name, value);
         }
@@ -128,6 +138,13 @@ impl Visitor<InterpreterResult> for Interpreter {
             Stmt::Block(block_stmt) => {
                 let environment = Environment::new(self.environment.clone());
                 self.execute_block(&block_stmt.statements, Rc::new(environment))
+            }
+            Stmt::Class(class_stmt) => {
+                self.define_var(class_stmt.name.lexeme.clone(), Value::Nil);
+                let class = Value::Class(LoxClass::new(class_stmt.name.lexeme.clone()));
+                self.assign_var(class_stmt.name.lexeme.clone(), class, None)
+                    .map(|_| None)
+                    .map_err(|msg| RuntimeError::new(class_stmt.name.line, msg))
             }
             Stmt::Expr(expr_stmt) => {
                 self.visit_expr(&expr_stmt.expression)?;
@@ -186,7 +203,7 @@ impl Visitor<InterpreterResult> for Interpreter {
                 }
                 Ok(None)
             }
-            _ => unimplemented!()
+            // _ => unimplemented!(),
         }
     }
 
@@ -198,7 +215,7 @@ impl Visitor<InterpreterResult> for Interpreter {
                 match self.assign_var(
                     name.lexeme.clone(),
                     value.clone().unwrap(),
-                    &assign_expr.scope_id,
+                    Some(&assign_expr.scope_id),
                 ) {
                     Ok(_) => Ok(value),
                     Err(msg) => runtime_error_result(name, &msg),
@@ -289,6 +306,10 @@ fn is_equal(a: Value, b: Value) -> bool {
     match a {
         Value::Boolean(a_bool) => match b {
             Value::Boolean(b_bool) => a_bool == b_bool,
+            _ => false,
+        },
+        Value::Class(a_class) => match b {
+            Value::Class(b_class) => a_class == b_class,
             _ => false,
         },
         Value::Function(a_fun) => match b {

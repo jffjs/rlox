@@ -1,11 +1,14 @@
-use crate::function::{LoxFunction, NativeFunction};
+use crate::{
+    class::LoxClass,
+    function::{LoxFunction, NativeFunction},
+};
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Nil,
     Boolean(bool),
-    // Class(Class),
+    Class(LoxClass),
     Function(LoxFunction),
     NativeFunction(NativeFunction),
     Number(f64),
@@ -17,6 +20,7 @@ impl fmt::Display for Value {
         match self {
             Value::Nil => write!(f, "nil"),
             Value::Boolean(b) => write!(f, "{}", b),
+            Value::Class(ref class) => write!(f, "{}", class),
             Value::Function(ref fun) => write!(f, "{}", fun),
             Value::Number(n) => write!(f, "{}", n),
             Value::String(ref s) => write!(f, "\"{}\"", s),
@@ -30,6 +34,7 @@ impl Value {
         match self {
             Value::Nil => format!("nil"),
             Value::Boolean(b) => format!("{}", b),
+            Value::Class(class) => format!("{}", class),
             Value::Function(fun) => format!("{}", fun),
             Value::Number(n) => format!("{}", n),
             Value::String(s) => format!("{}", s),

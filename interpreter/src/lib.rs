@@ -2,6 +2,7 @@ extern crate ast;
 use std::error::Error;
 
 mod callable;
+mod class;
 mod environment;
 mod error;
 mod function;
