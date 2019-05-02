@@ -456,49 +456,49 @@ fn or(tokens: &Vec<Token>, pos: usize) -> ExprResult {
 
 fn and(tokens: &Vec<Token>, pos: usize) -> ExprResult {
     match equality(tokens, pos) {
-        ExprResult::Ok(mut expr, mut pos) => {
+        Ok((mut expr, mut pos)) => {
             let mut next_tok = &tokens[pos];
             while match_type(next_tok, vec![TokenType::And]) {
                 let operator = &tokens[pos];
                 match equality(tokens, pos + 1) {
-                    ExprResult::Ok(right, next_pos) => {
+                    Ok((right, next_pos)) => {
                         pos = next_pos;
                         expr = ast::Expr::logical(expr, operator, right);
                     }
-                    ExprResult::Err(msg, pos) => return ExprResult::Err(msg, pos),
+                    Err(err) => return Err(err),
                 }
                 next_tok = &tokens[pos];
             }
-            ExprResult::Ok(expr, pos)
+            Ok((expr, pos))
         }
-        ExprResult::Err(err, pos) => ExprResult::Err(err, pos),
+        Err(err) => Err(err),
     }
 }
 
 fn equality(tokens: &Vec<Token>, pos: usize) -> ExprResult {
     match comparison(tokens, pos) {
-        ExprResult::Ok(mut expr, mut pos) => {
+        Ok((mut expr, mut pos)) => {
             let mut next_tok = &tokens[pos];
             while match_type(next_tok, vec![TokenType::BangEqual, TokenType::EqualEqual]) {
                 let operator = &tokens[pos];
                 match comparison(tokens, pos + 1) {
-                    ExprResult::Ok(right, next_pos) => {
+                    Ok((right, next_pos)) => {
                         pos = next_pos;
                         expr = ast::Expr::binary(expr, operator, right);
                     }
-                    ExprResult::Err(msg, pos) => return ExprResult::Err(msg, pos),
+                    Err(err) => return Err(err),
                 }
                 next_tok = &tokens[pos];
             }
-            ExprResult::Ok(expr, pos)
+            Ok((expr, pos))
         }
-        ExprResult::Err(msg, pos) => ExprResult::Err(msg, pos),
+        Err(err) => Err(err),
     }
 }
 
 fn comparison(tokens: &Vec<Token>, pos: usize) -> ExprResult {
     match addition(tokens, pos) {
-        ExprResult::Ok(mut expr, mut pos) => {
+        Ok((mut expr, mut pos)) => {
             let mut next_tok = &tokens[pos];
             while match_type(
                 next_tok,
@@ -511,59 +511,59 @@ fn comparison(tokens: &Vec<Token>, pos: usize) -> ExprResult {
             ) {
                 let operator = &tokens[pos];
                 match addition(tokens, pos + 1) {
-                    ExprResult::Ok(right, next_pos) => {
+                    Ok((right, next_pos)) => {
                         pos = next_pos;
                         expr = ast::Expr::binary(expr, operator, right);
                     }
-                    ExprResult::Err(msg, pos) => return ExprResult::Err(msg, pos),
+                    Err(err) => return Err(err),
                 }
                 next_tok = &tokens[pos];
             }
-            ExprResult::Ok(expr, pos)
+            Ok((expr, pos))
         }
-        ExprResult::Err(msg, pos) => ExprResult::Err(msg, pos),
+        Err(err) => Err(err),
     }
 }
 
 fn addition(tokens: &Vec<Token>, pos: usize) -> ExprResult {
     match multiplication(tokens, pos) {
-        ExprResult::Ok(mut expr, mut pos) => {
+        Ok((mut expr, mut pos)) => {
             let mut next_tok = &tokens[pos];
             while match_type(next_tok, vec![TokenType::Plus, TokenType::Minus]) {
                 let operator = &tokens[pos];
                 match multiplication(tokens, pos + 1) {
-                    ExprResult::Ok(right, next_pos) => {
+                    Ok((right, next_pos)) => {
                         pos = next_pos;
                         expr = ast::Expr::binary(expr, operator, right);
                     }
-                    ExprResult::Err(msg, pos) => return ExprResult::Err(msg, pos),
+                    Err(err) => return Err(err),
                 }
                 next_tok = &tokens[pos];
             }
-            ExprResult::Ok(expr, pos)
+            Ok((expr, pos))
         }
-        ExprResult::Err(msg, pos) => ExprResult::Err(msg, pos),
+        Err(err) => Err(err),
     }
 }
 
 fn multiplication(tokens: &Vec<Token>, pos: usize) -> ExprResult {
     match unary(tokens, pos) {
-        ExprResult::Ok(mut expr, mut pos) => {
+        Ok((mut expr, mut pos)) => {
             let mut next_tok = &tokens[pos];
             while match_type(next_tok, vec![TokenType::Star, TokenType::Slash]) {
                 let operator = &tokens[pos];
                 match unary(tokens, pos + 1) {
-                    ExprResult::Ok(right, next_pos) => {
+                    Ok((right, next_pos)) => {
                         pos = next_pos;
                         expr = ast::Expr::binary(expr, operator, right);
                     }
-                    ExprResult::Err(msg, pos) => return ExprResult::Err(msg, pos),
+                    Err(err) => return Err(err),
                 }
                 next_tok = &tokens[pos];
             }
-            ExprResult::Ok(expr, pos)
+            Ok((expr, pos))
         }
-        ExprResult::Err(msg, pos) => ExprResult::Err(msg, pos),
+        Err(err) => Err(err),
     }
 }
 
@@ -572,8 +572,8 @@ fn unary(tokens: &Vec<Token>, pos: usize) -> ExprResult {
     if match_type(next_tok, vec![TokenType::Bang, TokenType::Minus]) {
         let operator = &tokens[pos];
         match unary(tokens, pos + 1) {
-            ExprResult::Ok(right, pos) => ExprResult::Ok(ast::Expr::unary(operator, right), pos),
-            ExprResult::Err(msg, pos) => ExprResult::Err(msg, pos),
+            Ok((right, pos)) => Ok((ast::Expr::unary(operator, right), pos)),
+            Err(err) => Err(err),
         }
     } else {
         call(tokens, pos)
@@ -582,7 +582,7 @@ fn unary(tokens: &Vec<Token>, pos: usize) -> ExprResult {
 
 fn call(tokens: &Vec<Token>, pos: usize) -> ExprResult {
     match primary(tokens, pos) {
-        ExprResult::Ok(mut expr, mut pos) => {
+        Ok((mut expr, mut pos)) => {
             loop {
                 match tokens[pos].token_type {
                     TokenType::LeftParen => {
@@ -591,17 +591,14 @@ fn call(tokens: &Vec<Token>, pos: usize) -> ExprResult {
                         if !check_token(&tokens[pos], TokenType::RightParen) {
                             loop {
                                 if args.len() >= 8 {
-                                    return ExprResult::Err(
-                                        "Cannot have more than 8 arguments.",
-                                        pos,
-                                    );
+                                    return Err(("Cannot have more than 8 arguments.", pos));
                                 }
                                 match expression(tokens, pos) {
-                                    ExprResult::Ok(arg, next_pos) => {
+                                    Ok((arg, next_pos)) => {
                                         args.push(arg);
                                         pos = next_pos;
                                     }
-                                    ExprResult::Err(msg, pos) => return ExprResult::Err(msg, pos),
+                                    Err(err) => return Err(err),
                                 }
 
                                 match tokens[pos].token_type {
@@ -617,7 +614,7 @@ fn call(tokens: &Vec<Token>, pos: usize) -> ExprResult {
                                 paren = &tokens[pos];
                                 pos += 1;
                             }
-                            _ => return ExprResult::Err("Expect ')' after arguments.", pos),
+                            _ => return Err(("Expect ')' after arguments.", pos)),
                         }
 
                         expr = ast::Expr::call(expr, paren, args);
@@ -625,31 +622,31 @@ fn call(tokens: &Vec<Token>, pos: usize) -> ExprResult {
                     _ => break,
                 }
             }
-            ExprResult::Ok(expr, pos)
+            Ok((expr, pos))
         }
-        ExprResult::Err(msg, pos) => ExprResult::Err(msg, pos),
+        Err(err) => Err(err),
     }
 }
 
 fn primary(tokens: &Vec<Token>, pos: usize) -> ExprResult {
     let token = &tokens[pos];
     match token.token_type {
-        TokenType::False => ExprResult::Ok(ast::Expr::literal(Literal::False), pos + 1),
-        TokenType::True => ExprResult::Ok(ast::Expr::literal(Literal::True), pos + 1),
-        TokenType::Nil => ExprResult::Ok(ast::Expr::literal(Literal::Nil), pos + 1),
+        TokenType::False => Ok((ast::Expr::literal(Literal::False), pos + 1)),
+        TokenType::True => Ok((ast::Expr::literal(Literal::True), pos + 1)),
+        TokenType::Nil => Ok((ast::Expr::literal(Literal::Nil), pos + 1)),
         TokenType::Number | TokenType::String => match token.literal.clone() {
-            Some(literal) => ExprResult::Ok(ast::Expr::literal(literal), pos + 1),
-            None => ExprResult::Err("Expect literal value.", pos),
+            Some(literal) => Ok((ast::Expr::literal(literal), pos + 1)),
+            None => Err(("Expect literal value.", pos)),
         },
         TokenType::LeftParen => match expression(tokens, pos + 1) {
-            ExprResult::Ok(expr, pos) => match (&tokens[pos]).token_type {
-                TokenType::RightParen => ExprResult::Ok(ast::Expr::grouping(expr), pos + 1),
-                _ => ExprResult::Err("Expect ')' after expression.", pos),
+            Ok((expr, pos)) => match (&tokens[pos]).token_type {
+                TokenType::RightParen => Ok((ast::Expr::grouping(expr), pos + 1)),
+                _ => Err(("Expect ')' after expression.", pos)),
             },
-            ExprResult::Err(msg, pos) => ExprResult::Err(msg, pos),
+            Err(err) => Err(err),
         },
-        TokenType::Identifier => ExprResult::Ok(ast::Expr::variable(token), pos + 1),
-        _ => ExprResult::Err("Expect expression", pos),
+        TokenType::Identifier => Ok((ast::Expr::variable(token), pos + 1)),
+        _ => Err(("Expect expression", pos)),
     }
 }
 
